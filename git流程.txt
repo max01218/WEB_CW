@@ -1,0 +1,12 @@
+git checkout main    # 或 develop，視團隊使用的主要分支而定
+git pull origin main  # 拉取最新代碼
+##寫完我的部分
+git checkout -b feature/new-feature
+git add .
+git commit -m "新增 xxx 功能"
+因為其他人可能已經推送了新的代碼，你需要確保你的分支與最新的 main 一致。
+git checkout main
+git pull origin main
+#merge
+git checkout feature/new-feature
+git merge main
