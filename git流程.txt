@@ -10,3 +10,11 @@ git pull origin main
 #merge
 git checkout feature/new-feature
 git merge main
+推送你的功能分支
+git push origin feature/new-feature
+
+
+合併 PR 並刪除分支git checkout main
+git pull origin main  # 確保 main 是最新的
+git branch -d feature/new-feature  # 刪除本地分支
+git push origin --delete feature/new-feature  # 刪除遠端分支
