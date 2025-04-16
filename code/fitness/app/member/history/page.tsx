@@ -17,6 +17,7 @@ interface TrainingRecord {
   sessionDate: string | Timestamp;  // 訓練日期
   status: 'completed' | 'cancelled' | 'pending';
   trainerId: string;
+  session?: string;  // 訓練課程類型
 }
 
 export default function HistoryPage() {
@@ -98,9 +99,9 @@ export default function HistoryPage() {
           const dateObj = date.toDate();
           return (
             <div>
-              <div>{dateObj.toLocaleDateString('zh-TW')}</div>
+              <div>{dateObj.toLocaleDateString('en-US')}</div>
               <div style={{ color: '#666', fontSize: '12px' }}>
-                {dateObj.toLocaleTimeString('zh-TW', { 
+                {dateObj.toLocaleTimeString('en-US', { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
@@ -111,9 +112,9 @@ export default function HistoryPage() {
         const dateObj = new Date(date);
         return (
           <div>
-            <div>{dateObj.toLocaleDateString('zh-TW')}</div>
+            <div>{dateObj.toLocaleDateString('en-US')}</div>
             <div style={{ color: '#666', fontSize: '12px' }}>
-              {dateObj.toLocaleTimeString('zh-TW', { 
+              {dateObj.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit' 
               })}
@@ -121,6 +122,12 @@ export default function HistoryPage() {
           </div>
         );
       }
+    },
+    {
+      title: "Session Type",
+      dataIndex: "session",
+      key: "session",
+      render: (session: string) => session || "Regular Training"
     },
     {
       title: "Duration",
@@ -214,9 +221,9 @@ export default function HistoryPage() {
               onClick={() => router.push('/member/dashboard')}
               icon={<ArrowLeftOutlined />}
             >
-              Return to Dashboard
+              Back to Dashboard
             </Button>
-            <h1 style={{ margin: 0 }}>Reservation History</h1>
+            <h1 style={{ margin: 0 }}>Training History</h1>
           </div>
         </div>
         <Table 
@@ -229,7 +236,7 @@ export default function HistoryPage() {
             showTotal: (total) => `Total ${total} records`
           }}
           locale={{
-            emptyText: "No historical record"
+            emptyText: "No training records found"
           }}
         />
       </div>
