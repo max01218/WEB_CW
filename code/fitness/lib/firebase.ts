@@ -3,14 +3,14 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDAUsIMEBY90HLIUtTzv6iIUjeldsrjtrI",
-    authDomain: "uosweb-50bcb.firebaseapp.com",
-    projectId: "uosweb-50bcb",
-    storageBucket: "uosweb-50bcb.firebasestorage.app",
-    messagingSenderId: "1062467805978",
-    appId: "1:1062467805978:web:ef76497ff69e323f5102a3",
-    measurementId: "G-CSQVKCKTVX"
-  };
+  apiKey: "AIzaSyDr_5sW5Q4jfuHxqs-oALXWQu1iYc0NYXA",
+  authDomain: "sportsclub6251.firebaseapp.com",
+  projectId: "sportsclub6251",
+  storageBucket: "sportsclub6251.firebasestorage.app",
+  messagingSenderId: "421553169101",
+  appId: "1:421553169101:web:440803f7e0bfdc41fcff84",
+  measurementId: "G-0ZESYPGVJX"
+};
 
 // 初始化 Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
