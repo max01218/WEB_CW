@@ -1,0 +1,69 @@
+.notification-item {
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.notification-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.notification-item-unread {
+  background-color: rgba(240, 247, 255, 0.8);
+  border: 1px solid #91caff;
+}
+
+.notification-item-unread:hover {
+  background-color: rgba(230, 244, 255, 0.9);
+}
+
+.notification-item-read {
+  background-color: transparent;
+  border: 1px solid #f0f0f0;
+}
+
+.notification-item-read:hover {
+  background-color: #fafafa;
+}
+
+.stat-card {
+  height: 100%;
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+.nav-card {
+  height: 180px;
+  border-radius: 20px;
+  border: none;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.nav-card-blue {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+}
+
+.nav-card-blue:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(24,144,255,0.25);
+}
+
+.nav-card-purple {
+  background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
+}
+
+.nav-card-purple:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(114,46,209,0.25);
+} 
