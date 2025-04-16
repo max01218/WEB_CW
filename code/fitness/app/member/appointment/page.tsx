@@ -3,8 +3,9 @@
 import { Table, Button, message, Spin, Tag } from "antd";
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, query, where, Timestamp, updateDoc, orderBy, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, doc, query, where, Timestamp, updateDoc, addDoc } from "firebase/firestore";
+import { ref, push } from 'firebase/database';
+import { db, database } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from 'next/navigation';
 
@@ -18,6 +19,10 @@ interface Appointment {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
+
+const encodeEmail = (email: string) => {
+  return email.replace(/[.@]/g, '_');
+};
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -44,6 +49,15 @@ export default function AppointmentsPage() {
         updatedAt: doc.data().updatedAt
       })) as Appointment[];
 
+      // 按日期排序
+      appointmentsData.sort((a, b) => {
+        const dateA = a.appointmentDate instanceof Timestamp ? 
+          a.appointmentDate.toDate() : new Date(a.appointmentDate);
+        const dateB = b.appointmentDate instanceof Timestamp ? 
+          b.appointmentDate.toDate() : new Date(b.appointmentDate);
+        return dateA.getTime() - dateB.getTime();
+      });
+
       setAppointments(appointmentsData);
     } catch (error) {
       console.error("Error fetching appointments:", error);
@@ -60,7 +74,7 @@ export default function AppointmentsPage() {
     }
     
     try {
-      // 計算兩週後的日期
+      // 计算两週後的日期
       const twoWeeksLater = new Date();
       twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
       
@@ -70,33 +84,95 @@ export default function AppointmentsPage() {
       const testAppointment = {
         email: memberData.email,
         trainerId: "trainer123",
-        appointmentDate: twoWeeksLater,
+        appointmentDate: Timestamp.fromDate(twoWeeksLater),
         status: "scheduled" as const,
         remarks: "Test appointment",
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
       };
 
       // Add appointment
       const appointmentRef = await addDoc(collection(db, "appointments"), testAppointment);
       
+      // 立即更新本地状态
+      const newAppointment: Appointment = {
+        id: appointmentRef.id,
+        email: memberData.email,
+        trainerId: "trainer123",
+        appointmentDate: Timestamp.fromDate(twoWeeksLater),
+        status: "scheduled",
+        remarks: "Test appointment",
+      };
+      setAppointments(prevAppointments => [...prevAppointments, newAppointment]);
+      
       // Create notification for the new appointment
       const notification = {
         email: memberData.email,
-        content: `New appointment scheduled for ${twoWeeksLater.toLocaleString()}`,
+        title: "New Appointment Reminder",
+        description: `You have successfully scheduled a training session for ${twoWeeksLater.toLocaleString()}`,
+        date: new Date().toISOString(),
         type: "appointment",
         read: false,
-        memberId: memberData.memberId,
-        updateTime: Timestamp.now()
+        appointmentId: appointmentRef.id,
+        createdAt: Timestamp.now()
       };
 
+      // 使用 Firestore 存储通知
       await addDoc(collection(db, "notifications"), notification);
       
       message.success("Test appointment created.");
-      fetchAppointments();
+      // 强制刷新 Dashboard 页面
+      router.refresh();
     } catch (error) {
       console.error("Error creating test appointment:", error);
       message.error("Failed to create test appointment.");
+      // 如果发生错误，重新获取数据
+      fetchAppointments();
+    }
+  };
+
+  const onCancelAppointment = async (record: Appointment) => {
+    try {
+      const appointmentRef = doc(db, "appointments", record.id);
+      await updateDoc(appointmentRef, {
+        status: "cancelled",
+        updatedAt: Timestamp.now()
+      });
+      
+      // 立即更新本地状态
+      setAppointments(prevAppointments => 
+        prevAppointments.filter(appointment => appointment.id !== record.id)
+      );
+      
+      // Create notification for the cancelled appointment
+      if (!memberData) {
+        throw new Error('Member data is required');
+      }
+
+      const notification = {
+        email: memberData.email,
+        title: "Appointment Cancellation Notice",
+        description: `You have cancelled the training session scheduled for ${record.appointmentDate instanceof Timestamp 
+          ? record.appointmentDate.toDate().toLocaleString()
+          : new Date(record.appointmentDate).toLocaleString()}`,
+        date: new Date().toISOString(),
+        type: "appointment",
+        read: false,
+        appointmentId: record.id,
+        createdAt: Timestamp.now()
+      };
+
+      // 使用 Firestore 存储通知
+      await addDoc(collection(db, "notifications"), notification);
+      
+      message.success("Appointment cancelled.");
+      // 强制刷新 Dashboard 页面
+      router.refresh();
+    } catch (error) {
+      console.error("Error canceling appointment:", error);
+      message.error("Failed to cancel appointment.");
+      // 如果发生错误，重新获取数据
+      fetchAppointments();
     }
   };
 
@@ -114,38 +190,6 @@ export default function AppointmentsPage() {
       }
     }
   }, [user, memberData, authLoading]);
-
-  const onCancelAppointment = async (record: Appointment) => {
-    try {
-      const appointmentRef = doc(db, "appointments", record.id);
-      await updateDoc(appointmentRef, {
-        status: "cancelled",
-        updatedAt: Timestamp.now()
-      });
-      
-      // Create notification for the cancelled appointment
-      const notification = {
-        email: memberData?.email,
-        content: `Appointment cancelled for ${
-          record.appointmentDate instanceof Timestamp 
-            ? record.appointmentDate.toDate().toLocaleString()
-            : new Date(record.appointmentDate).toLocaleString()
-        }`,
-        type: "appointment",
-        read: false,
-        memberId: memberData?.memberId,
-        updateTime: Timestamp.now()
-      };
-
-      await addDoc(collection(db, "notifications"), notification);
-      
-      message.success("Appointment cancelled.");
-      fetchAppointments();
-    } catch (error) {
-      console.error("Error canceling appointment:", error);
-      message.error("Failed to cancel appointment.");
-    }
-  };
 
   const statusColors = {
     scheduled: "processing",

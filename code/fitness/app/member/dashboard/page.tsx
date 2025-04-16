@@ -1,9 +1,10 @@
 // app/member/view/dashboard/page.js
 "use client";
 
-import { Card, Row, Col, Statistic, Button, Typography, Badge } from "antd";
+import { Card, Row, Col, Statistic, Button, Typography, Badge, Popover, List, Spin, message } from "antd";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import './styles.css';
 import { 
   ClockCircleOutlined, 
   HistoryOutlined, 
@@ -11,14 +12,40 @@ import {
   BellOutlined,
   UserOutlined,
   LogoutOutlined,
-  TrophyOutlined 
+  TrophyOutlined,
+  CheckOutlined,
+  PlusOutlined
 } from "@ant-design/icons";
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, Timestamp, onSnapshot, orderBy, addDoc } from 'firebase/firestore';
+import { ref, onValue, update } from 'firebase/database';
+import { db, database } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import { doc, updateDoc } from 'firebase/firestore';
+import {
+  containerStyle,
+  contentStyle,
+  headerStyle,
+  avatarContainerStyle,
+  avatarStyle,
+  titleStyle,
+  welcomeTextStyle,
+  headerActionsStyle,
+  bellButtonStyle,
+  logoutButtonStyle,
+  statisticTitleStyle,
+  statisticIconStyle,
+  statisticValueStyle,
+  statisticDescStyle,
+  dotStyle,
+  navCardIconStyle,
+  navCardTitleStyle,
+  navCardValueStyle,
+  navCardDescStyle,
+  navCardDotStyle
+} from './styles';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 interface DashboardStats {
   totalTrainingMinutes: number;
@@ -27,16 +54,168 @@ interface DashboardStats {
   unreadNotifications: number;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  type: 'appointment' | 'training' | 'system';
+  read: boolean;
+}
+
+// 添加一个辅助函数来编码邮箱地址
+const encodeEmail = (email: string) => {
+  return email.replace(/[.@]/g, '_');
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     totalTrainingMinutes: 0,
     upcomingAppointments: 0,
     completedTrainings: 0,
-    unreadNotifications: 0,
+    unreadNotifications: 0
   });
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, memberData, signOut } = useAuth();
+  const { user, memberData, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // 监听预约变化
+  useEffect(() => {
+    if (!user || !memberData) return;
+
+    const now = new Date();
+    const appointmentQuery = query(
+      collection(db, 'appointments'),
+      where('email', '==', memberData.email),
+      where('status', '==', 'scheduled')
+    );
+
+    // 设置实时监听
+    const unsubscribeAppointments = onSnapshot(appointmentQuery, (snapshot) => {
+      const upcomingAppointments = snapshot.docs.filter(doc => {
+        const appointmentDate = doc.data().appointmentDate;
+        if (appointmentDate instanceof Timestamp) {
+          return appointmentDate.toDate() > now;
+        }
+        return new Date(appointmentDate) > now;
+      }).length;
+
+      setStats(prev => ({
+        ...prev,
+        upcomingAppointments
+      }));
+    });
+
+    return () => {
+      unsubscribeAppointments();
+    };
+  }, [user, memberData]);
+
+  // 监听训练记录变化
+  useEffect(() => {
+    if (!user || !memberData) return;
+
+    const trainingQuery = query(
+      collection(db, 'trainingRecords'),
+      where('email', '==', memberData.email),
+      where('status', '==', 'completed')
+    );
+
+    // 设置实时监听
+    const unsubscribeTraining = onSnapshot(trainingQuery, (snapshot) => {
+      const completedTrainings = snapshot.docs.length;
+      const totalMinutes = snapshot.docs.reduce(
+        (total, doc) => total + (doc.data().duration || 0), 
+        0
+      );
+
+      setStats(prev => ({
+        ...prev,
+        totalTrainingMinutes: totalMinutes,
+        completedTrainings
+      }));
+    });
+
+    return () => {
+      unsubscribeTraining();
+    };
+  }, [user, memberData]);
+
+  const markAsRead = async (notificationId: string) => {
+    if (!memberData?.email) return;
+
+    try {
+      const notificationRef = doc(db, 'notifications', notificationId);
+      await updateDoc(notificationRef, { read: true });
+      
+      // 本地状态会通过 onSnapshot 自动更新
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // 监听通知变化
+  useEffect(() => {
+    if (!memberData?.email) return;
+
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('email', '==', memberData.email),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc')
+    );
+    
+    // 设置实时监听
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      const notificationsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Notification[];
+      
+      setNotifications(notificationsList);
+      setStats(prev => ({
+        ...prev,
+        unreadNotifications: notificationsList.length
+      }));
+
+      // 如果有新通知，显示提醒
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const notification = change.doc.data();
+          message.open({
+            type: 'info',
+            content: (
+              <div>
+                <div style={{ fontWeight: 'bold' }}>{notification.title}</div>
+                <div>{notification.description}</div>
+              </div>
+            ),
+            duration: 5,
+            icon: <BellOutlined style={{ color: '#1890ff' }} />
+          });
+        }
+      });
+    });
+
+    return () => {
+      unsubscribeNotifications();
+    };
+  }, [memberData?.email]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      if (!memberData) {
+        setLoading(true);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [user, memberData, authLoading]);
 
   const handleLogout = async () => {
     try {
@@ -47,122 +226,231 @@ export default function DashboardPage() {
     }
   };
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!user || !memberData) return;
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'appointment':
+        return '📅';
+      case 'training':
+        return '💪';
+      case 'system':
+        return '🔔';
+      default:
+        return '📌';
+    }
+  };
 
-      try {
-        const trainingQuery = query(
-          collection(db, 'trainingRecords'),
-          where('email', '==', memberData.email),
-          where('status', '==', 'completed')
-        );
-        const trainingSnapshot = await getDocs(trainingQuery);
-        const completedTrainings = trainingSnapshot.docs.length;
-        const totalMinutes = trainingSnapshot.docs.reduce(
-          (total, doc) => total + (doc.data().duration || 0), 
-          0
-        );
+  const notificationContent = (
+    <div style={{ 
+      width: 350, 
+      maxHeight: 450, 
+      overflow: 'auto',
+      padding: '8px',
+      borderRadius: '8px'
+    }}>
+      {loading ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <Spin size="large" />
+          <Text type="secondary">Loading notifications...</Text>
+        </div>
+      ) : notifications.length > 0 ? (
+        <List
+          dataSource={notifications}
+          renderItem={(item) => (
+            <List.Item
+              className={`notification-item ${item.read ? 'notification-item-read' : 'notification-item-unread'}`}
+            >
+              <div style={{ width: '100%' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginBottom: '8px' 
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px' 
+                  }}>
+                    <span style={{ 
+                      fontSize: '20px',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                    }}>
+                      {getNotificationIcon(item.type)}
+                    </span>
+                    <Text strong style={{ fontSize: '15px' }}>{item.title}</Text>
+                  </div>
+                  {!item.read && (
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => markAsRead(item.id)}
+                      style={{
+                        color: '#1890ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 12px',
+                        borderRadius: '15px',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Mark as Read
+                    </Button>
+                  )}
+                </div>
+                <Text type="secondary" style={{ 
+                  fontSize: '13px',
+                  display: 'block',
+                  marginBottom: '6px'
+                }}>
+                  {new Date(item.date).toLocaleString()}
+                </Text>
+                <div style={{ marginTop: '4px' }}>
+                  <Text style={{ fontSize: '14px', lineHeight: '1.5' }}>
+                    {item.description}
+                  </Text>
+                </div>
+              </div>
+            </List.Item>
+          )}
+        />
+      ) : (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px', 
+          color: '#666',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px' 
+        }}>
+          <BellOutlined style={{ fontSize: '24px', opacity: 0.5 }} />
+          <Text type="secondary">No notifications</Text>
+        </div>
+      )}
+    </div>
+  );
 
-        const now = new Date();
-        const appointmentQuery = query(
-          collection(db, 'appointments'),
-          where('email', '==', memberData.email),
-          where('status', '==', 'scheduled')
-        );
-        const appointmentSnapshot = await getDocs(appointmentQuery);
-        const upcomingAppointments = appointmentSnapshot.docs.filter(doc => {
-          const appointmentDate = doc.data().appointmentDate;
-          if (appointmentDate instanceof Timestamp) {
-            return appointmentDate.toDate() > now;
-          }
-          return new Date(appointmentDate) > now;
-        }).length;
+  const createTestAppointment = async () => {
+    if (!memberData?.email) return;
 
-        const notificationsQuery = query(
-          collection(db, 'notifications'),
-          where('email', '==', memberData.email),
-          where('read', '==', false)
-        );
-        const notificationsSnapshot = await getDocs(notificationsQuery);
-        const unreadNotifications = notificationsSnapshot.docs.length;
+    try {
+      // 计算两周后的日期
+      const twoWeeksLater = new Date();
+      twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
+      twoWeeksLater.setHours(10, 0, 0, 0); // 设置为上午10点
 
-        setStats({
-          totalTrainingMinutes: totalMinutes,
-          upcomingAppointments,
-          completedTrainings,
-          unreadNotifications,
-        });
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const testAppointment = {
+        email: memberData.email,
+        appointmentDate: Timestamp.fromDate(twoWeeksLater),
+        status: 'scheduled',
+        type: 'training',
+        notes: 'Test appointment created from dashboard',
+        createdAt: Timestamp.now()
+      };
 
-    fetchStats();
-  }, [user, memberData]);
+      // 添加预约
+      const appointmentRef = await addDoc(collection(db, 'appointments'), testAppointment);
+
+      // 创建通知
+      const notification = {
+        email: memberData.email,
+        title: 'New Appointment Scheduled',
+        description: `Test appointment scheduled for ${twoWeeksLater.toLocaleDateString()} at 10:00 AM`,
+        date: Timestamp.now(),
+        type: 'appointment',
+        read: false,
+        appointmentId: appointmentRef.id,
+        createdAt: Timestamp.now()
+      };
+
+      await addDoc(collection(db, 'notifications'), notification);
+
+      message.success('Test appointment created successfully!');
+    } catch (error) {
+      console.error('Error creating test appointment:', error);
+      message.error('Failed to create test appointment');
+    }
+  };
 
   return (
-    <div style={{ 
-      padding: "24px",
-      background: "linear-gradient(135deg, #f0f2f5 0%, #e6e9f0 100%)",
-      minHeight: "100vh"
-    }}>
-      <div style={{ 
-        maxWidth: "1200px", 
-        margin: "0 auto",
-        padding: "24px",
-        background: "rgba(255, 255, 255, 0.95)",
-        borderRadius: "16px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-        backdropFilter: "blur(10px)"
-      }}>
-        <div style={{ 
-          marginBottom: "32px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 8px"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "24px",
-              background: "linear-gradient(135deg, #1890ff 0%, #096dd9 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>
-              <UserOutlined style={{ fontSize: "24px", color: "#fff" }} />
+    <div style={containerStyle}>
+      <div style={contentStyle}>
+        <div style={headerStyle}>
+          <div style={avatarContainerStyle}>
+            <div style={avatarStyle}>
+              <UserOutlined style={{ fontSize: "28px", color: "#fff" }} />
             </div>
             <div>
-              <Title level={2} style={{ margin: 0, fontSize: "28px" }}>
+              <Title level={2} style={titleStyle}>
                 Member Dashboard
               </Title>
-              <span style={{ color: "#666", fontSize: "16px" }}>
+              <span style={welcomeTextStyle}>
                 Welcome back, {memberData?.name || 'Member'}!
               </span>
             </div>
           </div>
-          <Button 
-            type="primary" 
-            danger 
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            size="large"
-            style={{
-              height: "40px",
-              borderRadius: "20px",
-              padding: "0 24px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px"
-            }}
-          >
-            Logout
-          </Button>
+          <div style={headerActionsStyle}>
+            <Popover
+              content={notificationContent}
+              title={
+                <div style={{
+                  padding: '8px 4px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  borderBottom: '1px solid #f0f0f0'
+                }}>
+                  Notifications
+                </div>
+              }
+              trigger="click"
+              placement="bottomRight"
+              overlayStyle={{ 
+                width: 350,
+                padding: 0
+              }}
+              overlayInnerStyle={{
+                borderRadius: '12px',
+                boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+              }}
+            >
+              <Badge 
+                count={notifications.filter(n => !n.read).length} 
+                offset={[-2, 2]}
+                style={{
+                  backgroundColor: '#ff4d4f'
+                }}
+              >
+                <Button
+                  type="text"
+                  icon={<BellOutlined style={{ 
+                    fontSize: '22px',
+                    color: 'rgba(0, 0, 0, 0.65)'
+                  }} />}
+                  className="notification-button"
+                  style={bellButtonStyle}
+                />
+              </Badge>
+            </Popover>
+            <Button 
+              type="primary" 
+              danger 
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+              size="large"
+              style={logoutButtonStyle}
+            >
+              Logout
+            </Button>
+          </div>
         </div>
         
         {/* Statistics cards */}
@@ -170,36 +458,21 @@ export default function DashboardPage() {
           <Col xs={24} sm={8}>
             <Card 
               hoverable 
-              style={{ 
-                height: "100%",
-                borderRadius: "12px",
-                border: "none",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-              }}
+              className="stat-card"
             >
               <Statistic
                 title={
-                  <div style={{ 
-                    fontSize: "16px", 
-                    color: "#1890ff",
-                    marginBottom: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}>
-                    <ClockCircleOutlined style={{ fontSize: "20px" }} />
+                  <div style={statisticTitleStyle("#1890ff")}>
+                    <ClockCircleOutlined style={statisticIconStyle("rgba(24,144,255,0.1)")} />
                     Total Training Hours
                   </div>
                 }
                 value={Math.round(stats.totalTrainingMinutes / 60 * 10) / 10}
                 suffix="hrs"
-                valueStyle={{ 
-                  color: "#1890ff", 
-                  fontSize: "28px",
-                  fontWeight: "bold" 
-                }}
+                valueStyle={statisticValueStyle("#1890ff")}
               />
-              <div style={{ marginTop: "12px", color: "#666" }}>
+              <div style={statisticDescStyle}>
+                <div style={dotStyle("#1890ff")} />
                 Accumulated training time
               </div>
             </Card>
@@ -207,35 +480,20 @@ export default function DashboardPage() {
           <Col xs={24} sm={8}>
             <Card 
               hoverable 
-              style={{ 
-                height: "100%",
-                borderRadius: "12px",
-                border: "none",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-              }}
+              className="stat-card"
             >
               <Statistic
                 title={
-                  <div style={{ 
-                    fontSize: "16px", 
-                    color: "#722ed1",
-                    marginBottom: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}>
-                    <CalendarOutlined style={{ fontSize: "20px" }} />
+                  <div style={statisticTitleStyle("#722ed1")}>
+                    <CalendarOutlined style={statisticIconStyle("rgba(114,46,209,0.1)")} />
                     Upcoming Sessions
                   </div>
                 }
                 value={stats.upcomingAppointments}
-                valueStyle={{ 
-                  color: "#722ed1", 
-                  fontSize: "28px",
-                  fontWeight: "bold" 
-                }}
+                valueStyle={statisticValueStyle("#722ed1")}
               />
-              <div style={{ marginTop: "12px", color: "#666" }}>
+              <div style={statisticDescStyle}>
+                <div style={dotStyle("#722ed1")} />
                 Scheduled training appointments
               </div>
             </Card>
@@ -243,35 +501,20 @@ export default function DashboardPage() {
           <Col xs={24} sm={8}>
             <Card 
               hoverable 
-              style={{ 
-                height: "100%",
-                borderRadius: "12px",
-                border: "none",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
-              }}
+              className="stat-card"
             >
               <Statistic
                 title={
-                  <div style={{ 
-                    fontSize: "16px", 
-                    color: "#fa8c16",
-                    marginBottom: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px"
-                  }}>
-                    <TrophyOutlined style={{ fontSize: "20px" }} />
+                  <div style={statisticTitleStyle("#fa8c16")}>
+                    <TrophyOutlined style={statisticIconStyle("rgba(250,140,22,0.1)")} />
                     Completed Sessions
                   </div>
                 }
                 value={stats.completedTrainings}
-                valueStyle={{ 
-                  color: "#fa8c16", 
-                  fontSize: "28px",
-                  fontWeight: "bold" 
-                }}
+                valueStyle={statisticValueStyle("#fa8c16")}
               />
-              <div style={{ marginTop: "12px", color: "#666" }}>
+              <div style={statisticDescStyle}>
+                <div style={dotStyle("#fa8c16")} />
                 Finished training sessions
               </div>
             </Card>
@@ -280,163 +523,76 @@ export default function DashboardPage() {
 
         {/* Navigation cards */}
         <Row gutter={[24, 24]}>
-          <Col xs={24} sm={8}>
+          <Col xs={24} sm={12}>
             <Link href="/member/appointment" style={{ textDecoration: 'none' }}>
               <Card 
                 hoverable 
-                style={{ 
-                  height: "180px",
-                  borderRadius: "16px",
-                  border: "none",
-                  background: "linear-gradient(135deg, #1890ff 0%, #096dd9 100%)",
-                  color: "#fff",
-                  overflow: "hidden",
-                  position: "relative"
-                }}
+                className="nav-card nav-card-blue"
               >
-                <div style={{
-                  position: "absolute",
-                  top: "20px",
-                  right: "20px",
-                  fontSize: "64px",
-                  opacity: "0.1"
-                }}>
+                <div style={navCardIconStyle}>
                   <CalendarOutlined />
                 </div>
                 <Statistic
                   title={
-                    <span style={{ 
-                      color: "#fff", 
-                      fontSize: "20px",
-                      fontWeight: "bold" 
-                    }}>
+                    <span style={navCardTitleStyle}>
                       Appointment Management
                     </span>
                   }
                   value="Schedule Training"
-                  valueStyle={{ 
-                    color: "#fff", 
-                    fontSize: '18px',
-                    marginTop: "8px"
-                  }}
+                  valueStyle={navCardValueStyle}
                 />
-                <div style={{ 
-                  marginTop: "16px", 
-                  fontSize: "14px", 
-                  opacity: 0.8,
-                  position: "relative",
-                  zIndex: 1
-                }}>
+                <div style={navCardDescStyle}>
+                  <div style={navCardDotStyle} />
                   Click to schedule your next session
                 </div>
               </Card>
             </Link>
           </Col>
-          <Col xs={24} sm={8}>
+          <Col xs={24} sm={12}>
             <Link href="/member/history" style={{ textDecoration: 'none' }}>
               <Card 
                 hoverable 
-                style={{ 
-                  height: "180px",
-                  borderRadius: "16px",
-                  border: "none",
-                  background: "linear-gradient(135deg, #722ed1 0%, #531dab 100%)",
-                  color: "#fff",
-                  overflow: "hidden",
-                  position: "relative"
-                }}
+                className="nav-card nav-card-purple"
               >
-                <div style={{
-                  position: "absolute",
-                  top: "20px",
-                  right: "20px",
-                  fontSize: "64px",
-                  opacity: "0.1"
-                }}>
+                <div style={navCardIconStyle}>
                   <HistoryOutlined />
                 </div>
                 <Statistic
                   title={
-                    <span style={{ 
-                      color: "#fff", 
-                      fontSize: "20px",
-                      fontWeight: "bold" 
-                    }}>
+                    <span style={navCardTitleStyle}>
                       Training History
                     </span>
                   }
                   value="View Records"
-                  valueStyle={{ 
-                    color: "#fff", 
-                    fontSize: '18px',
-                    marginTop: "8px"
-                  }}
+                  valueStyle={navCardValueStyle}
                 />
-                <div style={{ 
-                  marginTop: "16px", 
-                  fontSize: "14px", 
-                  opacity: 0.8,
-                  position: "relative",
-                  zIndex: 1
-                }}>
+                <div style={navCardDescStyle}>
+                  <div style={navCardDotStyle} />
                   Track your progress
                 </div>
               </Card>
             </Link>
           </Col>
-          <Col xs={24} sm={8}>
-            <Link href="/member/notification" style={{ textDecoration: 'none' }}>
-              <Badge count={stats.unreadNotifications} offset={[-30, 30]}>
-                <Card 
-                  hoverable 
-                  style={{ 
-                    height: "180px",
-                    borderRadius: "16px",
-                    border: "none",
-                    background: "linear-gradient(135deg, #fa8c16 0%, #d46b08 100%)",
-                    color: "#fff",
-                    overflow: "hidden",
-                    position: "relative"
-                  }}
-                >
-                  <div style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
-                    fontSize: "64px",
-                    opacity: "0.1"
-                  }}>
-                    <BellOutlined />
-                  </div>
-                  <Statistic
-                    title={
-                      <span style={{ 
-                        color: "#fff", 
-                        fontSize: "20px",
-                        fontWeight: "bold" 
-                      }}>
-                        Notifications
-                      </span>
-                    }
-                    value={stats.unreadNotifications > 0 ? `${stats.unreadNotifications} unread` : "All caught up"}
-                    valueStyle={{ 
-                      color: "#fff", 
-                      fontSize: '18px',
-                      marginTop: "8px"
-                    }}
-                  />
-                  <div style={{ 
-                    marginTop: "16px", 
-                    fontSize: "14px", 
-                    opacity: 0.8,
-                    position: "relative",
-                    zIndex: 1
-                  }}>
-                    View your notifications
-                  </div>
-                </Card>
-              </Badge>
-            </Link>
+        </Row>
+
+        {/* Test Appointment Button */}
+        <Row style={{ marginTop: "24px" }}>
+          <Col span={24} style={{ textAlign: 'center' }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={createTestAppointment}
+              style={{
+                height: '40px',
+                padding: '0 24px',
+                borderRadius: '20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                background: 'linear-gradient(45deg, #1890ff, #096dd9)',
+                border: 'none'
+              }}
+            >
+              Create Test Appointment
+            </Button>
           </Col>
         </Row>
       </div>
