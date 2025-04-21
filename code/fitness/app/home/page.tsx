@@ -1,12 +1,11 @@
 'use client'
 import React, { useState } from 'react';
 import 'antd/dist/reset.css';
-import { Breadcrumb, Layout, Menu, theme,Button, Flex } from 'antd';
+import { Layout, Menu, theme,Button, Flex } from 'antd';
 import Image from 'next/image';
 import Login from '../login/page'
-import Link from "next/link";
-import styles from './page.module.scss'
 import { usePathname,useRouter } from 'next/navigation';
+import styles from './page.module.scss'
 
 
 const { Header, Content, Footer } = Layout;
@@ -71,6 +70,7 @@ const App: React.FC = () => {
             width={120}
             height={40}
           />
+         <h1 className="site-title">Fitness Training System</h1>
         <Menu
           theme="dark"
           mode="horizontal"

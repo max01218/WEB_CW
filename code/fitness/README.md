@@ -77,6 +77,19 @@ npm install
 npm run dev
 ```
 
+##  Firestore-members 字段
+
+字段名 | 类型 | 描述
+uid | string | Firebase 自动生成的用户 ID
+name | string | 用户填写
+birthdate | string/date | 用户填写
+address | string | 用户填写
+email | string | 用户填写
+role | string | 默认为 'member'
+status | string | 默认为 'active'
+createdAt | timestamp | 当前时间
+updatedAt | timestamp | 当前时间
+
 ## 贡献指南
 
 欢迎提交 Issue 和 Pull Request 来帮助改进项目。

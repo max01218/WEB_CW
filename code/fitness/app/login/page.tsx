@@ -7,6 +7,8 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth ,db } from '@/lib/firebase'; 
 import styles from './page.module.scss';
+import LoginBoxWrapper from '@/app/components/LoginBoxWrapper';
+
 
 interface Iprops {
   isShow: boolean;
@@ -60,8 +62,10 @@ const Login = (props : Iprops) => {
 
       if (role === 'admin') {
         router.push('/member/dashboard');
+        console.log("admin跳转")
       } else {
         router.push('/home');
+        console.log("member跳转到home")
       }
 
       onClose();
@@ -95,7 +99,7 @@ const Login = (props : Iprops) => {
 
 
   const handleReg = () => {
-
+    router.push('/register');
   }
 
   const handleOAuthGoogle = () => {
@@ -107,40 +111,38 @@ const Login = (props : Iprops) => {
     setform(f => ({ ...f, [name]: value }));
   }
 
- return isShow ? (
-  <div className = {styles.loginArea}>
-    <div className={styles.loginBox}> 
-      <div className={styles.loginTitle}>
-        <div>Access via email</div>
-        <div className={styles.close} onClick={handleClose}>x</div>
-      </div>
+  return isShow ? (
+    <LoginBoxWrapper onClose={handleClose}>
       {error && <div className={styles.error}>{error}</div>}
-      <input 
-        name= "email" 
-        type="email" 
-        placeholder='please input email'  
-        value={form.email} 
+      <input
+        name="email"
+        type="email"
+        placeholder="please input email"
+        value={form.email}
         onChange={handleFromChange}
       />
-      <input 
-        name= "password" 
-        type="password" 
-        placeholder='please input password'  
-        value={form.password} 
+      <input
+        name="password"
+        type="password"
+        placeholder="please input password"
+        value={form.password}
         onChange={handleFromChange}
       />
-      <div className={styles.buttonGroup}>
-      <Button 
-        className={styles.loginBtn} 
-        onClick={handleLogin} disabled={loading}>
+      <Button
+        className={styles.loginBtn}
+        onClick={handleLogin}
+        disabled={loading}
+      >
         Login
       </Button>
-      <Button className={styles.regBtn} onClick={handleReg}>register</Button>
+      <Button className={styles.regBtn} onClick={handleReg}>
+        register
+      </Button>
+      <div className={styles.otherLogin} onClick={handleOAuthGoogle}>
+        Login via google email
       </div>
-      <div className={styles.otherLogin} onClick={handleOAuthGoogle}>Login via google email</div>
-    </div>
-  </div>
- ) : null ;
+    </LoginBoxWrapper>
+  ) : null;
 };
 
 export default Login;
