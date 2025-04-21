@@ -1,84 +1,146 @@
+// src/pages/Login.tsx
 'use client';
-
-import { useState } from 'react';
-import { Card, Input, Button, message, Form } from 'antd';
+import { ChangeEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from 'antd';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth ,db } from '@/lib/firebase'; 
+import styles from './page.module.scss';
 
-export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
+interface Iprops {
+  isShow: boolean;
+  onClose: () => void;
+}
+
+const Login = (props : Iprops) => {
   const router = useRouter();
+  const { isShow = false , onClose} = props;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const onFinish = async (values: { email: string; password: string }) => {
-    setLoading(true);
+  const [form, setform] = useState({
+    email:'',
+    password:'',
+  });
+
+  const handleClose = () => {
+    onClose();
+    setError(''); 
+  }
+
+  const handleLogin = async () => {
+    if (!form.email || !form.password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      message.success('登入成功');
-      router.push('/member/dashboard'); // 登入成功後轉到儀表板
-    } catch (error: any) {
-      console.error('Login error:', error);
-      message.error(error.message || '登入失敗');
+      setLoading(true);
+      setError('');
+
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        form.email,
+        form.password
+      );
+
+      const userRef  = doc(db, 'members', cred.user.uid);
+      const userDoc = await getDoc(userRef);
+
+      
+      if (!userDoc.exists()) {
+        setError('User data not found');
+        await auth.signOut(); 
+        return;
+      }
+
+      const userData = userDoc.data();
+      const role = userData?.role || 'member';
+
+      if (role === 'admin') {
+        router.push('/member/dashboard');
+      } else {
+        router.push('/home');
+      }
+
+      onClose();
+
+    } catch (err : any) {
+      console.error('Login error:', err);
+      switch (err.code) {
+        case 'auth/invalid-email':
+          setError('Invalid email format');
+          break;
+        case 'auth/user-not-found':
+          setError('No user found with this email');
+          break;
+        case 'auth/wrong-password':
+          setError('Wrong password');
+          break;
+        case 'auth/network-request-failed':
+          setError('Network error – please check your connection');
+          break;
+        case 'permission-denied':
+          setError('No permission to read user data');
+          break;
+        default:
+          // If Firestore threw a plain Error or something else:
+          setError(err.message || 'An unexpected error occurred');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      background: '#f5f5f5'
-    }}>
-      <Card
-        title="會員登入"
-        style={{
-          width: 400,
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-        }}
-      >
-        <Form
-          name="login"
-          onFinish={onFinish}
-          layout="vertical"
-        >
-          <Form.Item
-            label="電子郵件"
-            name="email"
-            rules={[{ required: true, message: '請輸入電子郵件' }]}
-          >
-            <Input size="large" placeholder="請輸入電子郵件" />
-          </Form.Item>
 
-          <Form.Item
-            label="密碼"
-            name="password"
-            rules={[{ required: true, message: '請輸入密碼' }]}
-          >
-            <Input.Password size="large" placeholder="請輸入密碼" />
-          </Form.Item>
+  const handleReg = () => {
 
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              block
-              size="large"
-            >
-              登入
-            </Button>
-          </Form.Item>
+  }
 
-          {/* 測試帳號提示 */}
-          <div style={{ textAlign: 'center', color: '#666' }}>
-            <p>測試帳號：test@example.com</p>
-            <p>測試密碼：123456</p>
-          </div>
-        </Form>
-      </Card>
+  const handleOAuthGoogle = () => {
+
+  }
+
+  const handleFromChange = (e : ChangeEvent<HTMLInputElement>) => {
+    const { name, value} = e?.target;
+    setform(f => ({ ...f, [name]: value }));
+  }
+
+ return isShow ? (
+  <div className = {styles.loginArea}>
+    <div className={styles.loginBox}> 
+      <div className={styles.loginTitle}>
+        <div>Access via email</div>
+        <div className={styles.close} onClick={handleClose}>x</div>
+      </div>
+      {error && <div className={styles.error}>{error}</div>}
+      <input 
+        name= "email" 
+        type="email" 
+        placeholder='please input email'  
+        value={form.email} 
+        onChange={handleFromChange}
+      />
+      <input 
+        name= "password" 
+        type="password" 
+        placeholder='please input password'  
+        value={form.password} 
+        onChange={handleFromChange}
+      />
+      <div className={styles.buttonGroup}>
+      <Button 
+        className={styles.loginBtn} 
+        onClick={handleLogin} disabled={loading}>
+        Login
+      </Button>
+      <Button className={styles.regBtn} onClick={handleReg}>register</Button>
+      </div>
+      <div className={styles.otherLogin} onClick={handleOAuthGoogle}>Login via google email</div>
     </div>
-  );
-} 
+  </div>
+ ) : null ;
+};
+
+export default Login;
