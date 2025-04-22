@@ -1,128 +1,136 @@
 'use client';
 
-import { useState, ChangeEvent } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import Link from 'next/link';
+import { message } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import LoginBoxWrapper from '@/app/components/LoginBoxWrapper';
-import styles from '../login/page.module.scss';
-import { Button, message } from 'antd';
-import { serverTimestamp } from 'firebase/firestore';
+import {
+  containerStyle,
+  cardStyle,
+  titleStyle,
+  formStyle,
+  inputStyle,
+  primaryButtonStyle,
+  linkContainerStyle,
+  linkStyle,
+  backButtonStyle,
+} from './styles';
+import './styles.css';
 
-
-const Register = () => {
+const RegisterPage = () => {
+  const [name, setName] = useState('');
+  const [birthdate, setBirthdate] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const router = useRouter();
-  const auth = getAuth();
 
-  const [form, setForm] = useState({
-    name: '',
-    birthdate: '',
-    address: '',
-    email: '',
-    password: '',
-  });
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      message.error('Passwords do not match!');
+      return;
+    }
 
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleClose = () => {
-    router.push('/home');
-  };
-
-  const handleRegister = async () => {
-    const { name, birthdate, address, email, password } = form;
-
-    if (!name || !birthdate || !address || !email || !password) {
-      setError('Please fill in all fields');
+    if (!name || !birthdate) {
+      message.error('Please fill in all fields!');
       return;
     }
 
     try {
-      setLoading(true);
-      setError('');
-
-      // 创建用户账号
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
-      // 写入 Firestore 的 members 表
+      // 创建用户档案
       await setDoc(doc(db, 'members', uid), {
         uid,
         name,
         birthdate,
-        address,
         email,
         role: 'member',
-        status: 'active',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date(),
       });
 
       message.success('Registration successful!');
-      router.push('/home');
-    } catch (err: any) {
-      console.error('Registration error:', err);
-      setError(err.message || 'Registration failed');
-    } finally {
-      setLoading(false);
+      router.push('/member/dashboard');
+    } catch (error) {
+      message.error('Registration failed. Please try again.');
     }
   };
 
   return (
-    <LoginBoxWrapper onClose={handleClose}>
-      {error && <div className={styles.error}>{error}</div>}
-      <input
-        name="name"
-        type="text"
-        placeholder="Name"
-        value={form.name}
-        onChange={handleChange}
-      />
-      <input
-        name="birthdate"
-        type="date"
-        placeholder="Birthdate"
-        value={form.birthdate}
-        onChange={handleChange}
-      />
-      <input
-        name="address"
-        type="text"
-        placeholder="Address"
-        value={form.address}
-        onChange={handleChange}
-      />
-      <input
-        name="email"
-        type="email"
-        placeholder="Email"
-        value={form.email}
-        onChange={handleChange}
-      />
-      <input
-        name="password"
-        type="password"
-        placeholder="Password"
-        value={form.password}
-        onChange={handleChange}
-      />
-      <Button
-        style={{ 
-          margin: "auto 95px" 
-        }}
-        onClick={handleRegister}
-        loading={loading}
-      >
-        Register
-      </Button>
-    </LoginBoxWrapper>
+    <div style={containerStyle}>
+      <Link href="/" style={backButtonStyle} className="register-button-secondary">
+        <ArrowLeftOutlined /> Back
+      </Link>
+      <div style={cardStyle}>
+        <h1 style={titleStyle}>Create Account</h1>
+        <form style={formStyle} onSubmit={handleRegister}>
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={inputStyle}
+            className="register-input"
+            required
+          />
+          <input
+            type="date"
+            placeholder="Date of Birth"
+            value={birthdate}
+            onChange={(e) => setBirthdate(e.target.value)}
+            style={inputStyle}
+            className="register-input"
+            required
+            min="1900-01-01"
+            max={new Date().toISOString().split('T')[0]}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
+            className="register-input"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
+            className="register-input"
+            required
+          />
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            style={inputStyle}
+            className="register-input"
+            required
+          />
+          <button type="submit" style={primaryButtonStyle} className="register-button-primary">
+            Register
+          </button>
+        </form>
+        <div style={linkContainerStyle}>
+          Already have an account?
+          <Link href="/login" style={linkStyle} className="register-link">
+            Login here
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default Register;
+export default RegisterPage;

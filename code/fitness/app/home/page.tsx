@@ -1,116 +1,100 @@
 'use client'
-import React, { useState } from 'react';
-import 'antd/dist/reset.css';
-import { Layout, Menu, theme,Button, Flex } from 'antd';
-import Image from 'next/image';
-import Login from '../login/page'
-import { usePathname,useRouter } from 'next/navigation';
-import styles from './page.module.scss'
+import React from 'react';
+import Link from 'next/link';
+import { UserOutlined, LoginOutlined, AppstoreOutlined, TrophyOutlined, TeamOutlined, CalendarOutlined } from '@ant-design/icons';
+import {
+  containerStyle,
+  headerStyle,
+  logoStyle,
+  navStyle,
+  heroSectionStyle,
+  heroContentStyle,
+  heroTitleStyle,
+  heroSubtitleStyle,
+  buttonContainerStyle,
+  primaryButtonStyle,
+  secondaryButtonStyle,
+  featureSectionStyle,
+  featureGridStyle,
+  featureCardStyle,
+  featureIconStyle,
+  featureTitleStyle,
+  featureDescStyle,
+  footerStyle,
+} from './styles';
+import './styles.css';
 
-
-const { Header, Content, Footer } = Layout;
-
-const items = [
-  {
-    key: 'membership',
-    label: 'Membership',
-    path: '/member'
-  },
-  {
-    key: 'appointment',
-    label: 'Appointment', 
-    path: '/member/appointment'
-  },
-  {
-    key: 'about',
-    label: 'About CWSport',
-    path: '/about-cwsport' 
-  },
-];
-
-const App: React.FC = () => {
-  const router = useRouter(); // 获取路由对象
-
-  const {
-    token: { colorBgContainer, borderRadiusLG },
-  } = theme.useToken();
-
-  const [isShowLogin, setIsShowLogin] = useState(false);
-
-  const handleLongin = () => {
-    setIsShowLogin(true);
-  };
-
-  const handleClose = () => {
-    // 类似单项数据流概念
-    setIsShowLogin(false);
-  }
-
-  const pathname = usePathname();
-  const handleMenuClick = (e: { key: string }) => {
-    const target = items.find(item => item.key === e.key)?.path;
-    if (target) router.push(target);
-  };
-
+const HomePage = () => {
   return (
-    <Layout>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center',
-        padding: '0 24px' 
-        }}>
-        <div className="demo-logo" style={{
-          marginRight: 40,
-          display: 'flex',
-          alignItems: 'center'
-        }} />
-        <Image
-            src="/images/logo.png" 
-            alt="Company Logo"
-            width={120}
-            height={40}
-          />
-         <h1 className="site-title">Fitness Training System</h1>
-        <Menu
-          theme="dark"
-          mode="horizontal"
-          selectedKeys={items
-            .filter(item => pathname.startsWith(item.path))
-            .map(item => item.key)}
-          items={items}
-          onClick={handleMenuClick}
-          style={{ 
-            flex: 1, 
-            minWidth: 0,
-            // justifyContent: 'flex-end'
-           }}
-        />
-        <Flex gap="small" wrap className='styles.operationArea'>
-          <Button type='primary' onClick={handleLongin}>Login</Button>
-        </Flex>
-        <Login isShow={isShowLogin} onClose={handleClose}></Login>
-      </Header>
-      <Content style={{ padding: '0 48px' }}>
-        {/* <Breadcrumb style={{ margin: '16px 0' }}>
-          <Breadcrumb.Item>Home</Breadcrumb.Item>
-          <Breadcrumb.Item>List</Breadcrumb.Item>
-          <Breadcrumb.Item>App</Breadcrumb.Item>
-        </Breadcrumb> */}
-        <div
-          style={{
-            background: colorBgContainer,
-            minHeight: 280,
-            padding: 24,
-            borderRadius: borderRadiusLG,
-          }}
-        >
+    <div style={containerStyle}>
+      <header style={headerStyle}>
+        <div style={logoStyle}>
+          <AppstoreOutlined /> Fitness Tracker
         </div>
-      </Content>
-      <Footer style={{ textAlign: 'center' }}>
-        Ant Design ©{new Date().getFullYear()} Created by Ant UED
-      </Footer>
-    </Layout>
+        <nav style={navStyle}>
+          <Link href="/login" className="nav-link">
+            Login
+          </Link>
+          <Link href="/register" className="nav-link">
+            Register
+          </Link>
+        </nav>
+      </header>
+
+      <section style={heroSectionStyle}>
+        <div style={heroContentStyle}>
+          <h1 style={heroTitleStyle}>Transform Your Fitness Journey</h1>
+          <p style={heroSubtitleStyle}>
+            Track your progress, connect with trainers, and achieve your fitness goals with our comprehensive platform.
+          </p>
+          <div style={buttonContainerStyle}>
+            <Link href="/register" style={primaryButtonStyle} className="primary-button">
+              Get Started
+            </Link>
+            <Link href="/login" style={secondaryButtonStyle} className="secondary-button">
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section style={featureSectionStyle}>
+        <div style={featureGridStyle}>
+          <div style={featureCardStyle} className="feature-card">
+            <div style={featureIconStyle}>
+              <TrophyOutlined />
+            </div>
+            <h3 style={featureTitleStyle}>Track Progress</h3>
+            <p style={featureDescStyle}>
+              Monitor your fitness journey with detailed analytics and milestone tracking.
+            </p>
+          </div>
+          <div style={featureCardStyle} className="feature-card">
+            <div style={featureIconStyle}>
+              <TeamOutlined />
+            </div>
+            <h3 style={featureTitleStyle}>Expert Training</h3>
+            <p style={featureDescStyle}>
+              Connect with professional trainers for personalized workout plans.
+            </p>
+          </div>
+          <div style={featureCardStyle} className="feature-card">
+            <div style={featureIconStyle}>
+              <CalendarOutlined />
+            </div>
+            <h3 style={featureTitleStyle}>Smart Scheduling</h3>
+            <p style={featureDescStyle}>
+              Easily manage your appointments and training sessions.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer style={footerStyle}>
+        © {new Date().getFullYear()} Fitness Tracker. All rights reserved.
+      </footer>
+    </div>
   );
 };
 
-export default App;
+export default HomePage;

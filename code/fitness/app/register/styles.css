@@ -1,0 +1,49 @@
+.register-input:focus {
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  outline: none;
+}
+
+.register-input::placeholder {
+  color: #64748B;
+  opacity: 1;
+}
+
+.register-input[type="date"] {
+  color-scheme: dark;
+  text-transform: uppercase;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.register-input[type="date"]::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.register-input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.register-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.8;
+}
+
+.register-input[type="date"]::-webkit-inner-spin-button {
+  display: none;
+}
+
+.register-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+}
+
+.register-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.register-link:hover {
+  color: #A78BFA;
+} 

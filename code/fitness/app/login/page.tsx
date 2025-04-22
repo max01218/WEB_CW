@@ -1,148 +1,162 @@
 // src/pages/Login.tsx
 'use client';
-import { ChangeEvent, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from 'antd';
+import Link from 'next/link';
+import { message } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth ,db } from '@/lib/firebase'; 
-import styles from './page.module.scss';
-import LoginBoxWrapper from '@/app/components/LoginBoxWrapper';
+import {
+  containerStyle,
+  cardStyle,
+  titleStyle,
+  formStyle,
+  inputStyle,
+  primaryButtonStyle,
+  linkContainerStyle,
+  linkStyle,
+  backButtonStyle,
+} from './styles';
+import './styles.css';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
-
-interface Iprops {
-  isShow: boolean;
-  onClose: () => void;
-}
-
-const Login = (props : Iprops) => {
-  const router = useRouter();
-  const { isShow = false , onClose} = props;
+const LoginPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const router = useRouter();
 
-  const [form, setform] = useState({
-    email:'',
-    password:'',
-  });
-
-  const handleClose = () => {
-    onClose();
-    setError(''); 
-  }
-
-  const handleLogin = async () => {
-    if (!form.email || !form.password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
+  const getUserRole = async (email: string): Promise<string> => {
     try {
-      setLoading(true);
-      setError('');
-
-      const cred = await signInWithEmailAndPassword(
-        auth,
-        form.email,
-        form.password
-      );
-
-      const userRef  = doc(db, 'members', cred.user.uid);
-      const userDoc = await getDoc(userRef);
-
+      console.log('Fetching role for email:', email);
       
-      if (!userDoc.exists()) {
-        setError('User data not found');
-        await auth.signOut(); 
-        return;
+      // 使用 email 字段查询 members 集合
+      const membersQuery = query(
+        collection(db, 'members'),
+        where('email', '==', email),
+        limit(1)
+      );
+      
+      console.log('Executing query for email:', email);
+      const querySnapshot = await getDocs(membersQuery);
+      
+      if (!querySnapshot.empty) {
+        const memberDoc = querySnapshot.docs[0];
+        const userData = memberDoc.data();
+        console.log('Raw user data from database:', userData);
+        console.log('Document ID:', memberDoc.id);
+        console.log('Role value:', userData.role);
+        
+        if (!userData.role) {
+          console.log('Role is undefined or null');
+          return 'member';
+        }
+        
+        // 不转换为小写，保持原始角色值
+        const role = userData.role;
+        console.log('User role:', role);
+        
+        // 更新有效角色列表，移除 supervisor，添加 admin
+        const validRoles = ['trainer', 'member', 'admin'];
+        if (!validRoles.includes(role)) {
+          console.log('Invalid role found:', role);
+          return 'member';
+        }
+        
+        return role;
       }
+      
+      console.log('No user document found for email:', email);
+      return 'member';
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      return 'member';
+    }
+  };
 
-      const userData = userDoc.data();
-      const role = userData?.role || 'member';
-
-      if (role === 'admin') {
-        router.push('/member/dashboard');
-        console.log("admin跳转")
-      } else {
-        router.push('/home');
-        console.log("member跳转到home")
-      }
-
-      onClose();
-
-    } catch (err : any) {
-      console.error('Login error:', err);
-      switch (err.code) {
-        case 'auth/invalid-email':
-          setError('Invalid email format');
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      console.log('Attempting login for email:', email);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Firebase authentication successful');
+      
+      const userRole = await getUserRole(email);
+      console.log('Final user role:', userRole);
+      message.success('Login successful!');
+      
+      switch (userRole) {
+        case 'admin':
+          console.log('Redirecting to admin dashboard');
+          router.push('/admin/dashboard');
           break;
-        case 'auth/user-not-found':
-          setError('No user found with this email');
-          break;
-        case 'auth/wrong-password':
-          setError('Wrong password');
-          break;
-        case 'auth/network-request-failed':
-          setError('Network error – please check your connection');
-          break;
-        case 'permission-denied':
-          setError('No permission to read user data');
+        case 'trainer':
+          console.log('Redirecting to trainer dashboard');
+          router.push('/trainer');
           break;
         default:
-          // If Firestore threw a plain Error or something else:
-          setError(err.message || 'An unexpected error occurred');
+          console.log('Redirecting to member dashboard');
+          router.push('/member/dashboard');
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      message.error('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
-
-  const handleReg = () => {
-    router.push('/register');
-  }
-
-  const handleOAuthGoogle = () => {
-
-  }
-
-  const handleFromChange = (e : ChangeEvent<HTMLInputElement>) => {
-    const { name, value} = e?.target;
-    setform(f => ({ ...f, [name]: value }));
-  }
-
-  return isShow ? (
-    <LoginBoxWrapper onClose={handleClose}>
-      {error && <div className={styles.error}>{error}</div>}
-      <input
-        name="email"
-        type="email"
-        placeholder="please input email"
-        value={form.email}
-        onChange={handleFromChange}
-      />
-      <input
-        name="password"
-        type="password"
-        placeholder="please input password"
-        value={form.password}
-        onChange={handleFromChange}
-      />
-      <Button
-        className={styles.loginBtn}
-        onClick={handleLogin}
-        disabled={loading}
-      >
-        Login
-      </Button>
-      <Button className={styles.regBtn} onClick={handleReg}>
-        register
-      </Button>
-      <div className={styles.otherLogin} onClick={handleOAuthGoogle}>
-        Login via google email
+  return (
+    <div style={containerStyle}>
+      <Link href="/" style={backButtonStyle} className="login-button-secondary">
+        <ArrowLeftOutlined /> Back
+      </Link>
+      <div style={cardStyle}>
+        <h1 style={titleStyle}>Welcome Back</h1>
+        <form style={formStyle} onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
+            className="login-input"
+            required
+            disabled={loading}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
+            className="login-input"
+            required
+            disabled={loading}
+          />
+          <button 
+            type="submit" 
+            style={primaryButtonStyle} 
+            className="login-button-primary"
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+        <div style={linkContainerStyle}>
+          Don't have an account?
+          <Link href="/register" style={linkStyle} className="login-link">
+            Register now
+          </Link>
+        </div>
       </div>
-    </LoginBoxWrapper>
-  ) : null;
+    </div>
+  );
 };
 
-export default Login;
+export default LoginPage;
