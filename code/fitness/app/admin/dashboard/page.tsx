@@ -1,20 +1,22 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { List, Button, Tag, Typography, message, Spin } from 'antd';
+import { List, Button, Tag, Typography, message, Spin, Card } from 'antd';
 import { LogoutOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { collection, query, getDocs, doc, updateDoc, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
+import dayjs from 'dayjs';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 interface Member {
   id: string;
   name: string;
   email: string;
-  status: string;
-  [key: string]: any;
+  birthdate: string;
+  appointmentStatus: boolean;
+  role: string;
 }
 
 const AdminDashboard = () => {
@@ -51,7 +53,8 @@ const AdminDashboard = () => {
     try {
       const membersQuery = query(
         collection(db, 'members'),
-        where('status', '==', 'pending')
+        where('role', '==', 'member'),
+        where('appointmentStatus', '==', false)
       );
       const querySnapshot = await getDocs(membersQuery);
       const membersData = querySnapshot.docs.map(doc => ({
@@ -67,16 +70,16 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleStatusUpdate = async (memberId: string, newStatus: string) => {
+  const handleAppointmentUpdate = async (memberId: string, approved: boolean) => {
     try {
       await updateDoc(doc(db, 'members', memberId), {
-        status: newStatus,
+        appointmentStatus: approved,
       });
-      message.success(newStatus === 'approved' ? 'Application approved' : 'Application rejected');
-      fetchMembers(); // Refresh the list
+      message.success(approved ? 'Appointment approved' : 'Appointment rejected');
+      fetchMembers(); // 刷新列表
     } catch (error) {
-      console.error('Error updating status:', error);
-      message.error('Failed to update application status');
+      console.error('Error updating appointment status:', error);
+      message.error('Failed to update appointment status');
     }
   };
 
@@ -96,7 +99,7 @@ const AdminDashboard = () => {
         Logout
       </Button>
       
-      <Title level={2} style={{ marginBottom: '24px' }}>Member Applications</Title>
+      <Title level={2} style={{ marginBottom: '24px' }}>Appointment Applications</Title>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -104,44 +107,40 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <List
-          itemLayout="horizontal"
+          grid={{ gutter: 16, column: 2 }}
           dataSource={members}
           renderItem={(member: Member) => (
-            <List.Item
-              actions={[
-                <Button
-                  key="approve"
-                  type="text"
-                  icon={<CheckCircleOutlined />}
-                  style={{ color: '#52c41a' }}
-                  onClick={() => handleStatusUpdate(member.id, 'approved')}
-                >
-                  Approve
-                </Button>,
-                <Button
-                  key="reject"
-                  type="text"
-                  icon={<CloseCircleOutlined />}
-                  danger
-                  onClick={() => handleStatusUpdate(member.id, 'rejected')}
-                >
-                  Reject
-                </Button>
-              ]}
-            >
-              <List.Item.Meta
-                title={member.name}
-                description={member.email}
-              />
-              <Tag color={
-                member.status === 'approved' ? 'success' :
-                member.status === 'rejected' ? 'error' :
-                'processing'
-              }>
-                {member.status.charAt(0).toUpperCase() + member.status.slice(1)}
-              </Tag>
+            <List.Item>
+              <Card>
+                <div style={{ marginBottom: '16px' }}>
+                  <Title level={4}>{member.name}</Title>
+                  <Text type="secondary">Email: {member.email}</Text>
+                  <br />
+                  <Text type="secondary">
+                    Birth Date: {dayjs(member.birthdate).format('YYYY-MM-DD')}
+                  </Text>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    onClick={() => handleAppointmentUpdate(member.id, true)}
+                    style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    onClick={() => handleAppointmentUpdate(member.id, false)}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </Card>
             </List.Item>
           )}
+          locale={{ emptyText: 'No pending appointments' }}
         />
       )}
     </div>

@@ -3,131 +3,151 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { message } from 'antd';
+import { Form, Input, Button, DatePicker, message, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import {
-  containerStyle,
-  cardStyle,
-  titleStyle,
-  formStyle,
-  inputStyle,
-  primaryButtonStyle,
-  linkContainerStyle,
-  linkStyle,
-  backButtonStyle,
-} from './styles';
-import './styles.css';
+import { auth, db } from '@/lib/firebase';
+import dayjs from 'dayjs';
+
+const { Title } = Typography;
 
 const RegisterPage = () => {
-  const [name, setName] = useState('');
-  const [birthdate, setBirthdate] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      message.error('Passwords do not match!');
-      return;
-    }
+  const containerStyle = {
+    maxWidth: '400px',
+    margin: '0 auto',
+    padding: '24px',
+    position: 'relative' as const,
+  };
 
-    if (!name || !birthdate) {
-      message.error('Please fill in all fields!');
-      return;
-    }
+  const cardStyle = {
+    padding: '24px',
+    borderRadius: '15px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    background: 'white',
+  };
 
+  const titleStyle = {
+    textAlign: 'center' as const,
+    marginBottom: '24px',
+  };
+
+  const backButtonStyle = {
+    marginBottom: '24px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+
+  const handleRegister = async (values: any) => {
+    setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      // 创建 Firebase Auth 用户
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      );
 
-      // 创建用户档案
-      await setDoc(doc(db, 'members', uid), {
-        uid,
-        name,
-        birthdate,
-        email,
+      // 准备用户数据
+      const userData = {
+        email: values.email,
+        name: values.name,
+        birthdate: dayjs(values.birthdate).format('YYYY-MM-DD'),
+        appointmentStatus: false,
         role: 'member',
-        createdAt: new Date(),
-      });
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uid: userCredential.user.uid,
+      };
+
+      // 存储用户数据到 Firestore
+      await setDoc(doc(db, 'members', userCredential.user.uid), userData);
 
       message.success('Registration successful!');
-      router.push('/member/dashboard');
-    } catch (error) {
-      message.error('Registration failed. Please try again.');
+      router.push('/login');
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      message.error(error.message || 'Registration failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div style={containerStyle}>
-      <Link href="/" style={backButtonStyle} className="register-button-secondary">
-        <ArrowLeftOutlined /> Back
+      <Link href="/" style={backButtonStyle}>
+        <ArrowLeftOutlined /> Back to Home
       </Link>
+
       <div style={cardStyle}>
-        <h1 style={titleStyle}>Create Account</h1>
-        <form style={formStyle} onSubmit={handleRegister}>
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={inputStyle}
-            className="register-input"
-            required
-          />
-          <input
-            type="date"
-            placeholder="Date of Birth"
-            value={birthdate}
-            onChange={(e) => setBirthdate(e.target.value)}
-            style={inputStyle}
-            className="register-input"
-            required
-            min="1900-01-01"
-            max={new Date().toISOString().split('T')[0]}
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-            className="register-input"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
-            className="register-input"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            style={inputStyle}
-            className="register-input"
-            required
-          />
-          <button type="submit" style={primaryButtonStyle} className="register-button-primary">
-            Register
-          </button>
-        </form>
-        <div style={linkContainerStyle}>
-          Already have an account?
-          <Link href="/login" style={linkStyle} className="register-link">
-            Login here
-          </Link>
-        </div>
+        <Title level={2} style={titleStyle}>Register</Title>
+
+        <Form
+          layout="vertical"
+          onFinish={handleRegister}
+          disabled={loading}
+        >
+          <Form.Item
+            label="Name"
+            name="name"
+            rules={[{ required: true, message: 'Please input your name!' }]}
+          >
+            <Input placeholder="Enter your name" />
+          </Form.Item>
+
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[
+              { required: true, message: 'Please input your email!' },
+              { type: 'email', message: 'Please enter a valid email!' }
+            ]}
+          >
+            <Input placeholder="Enter your email" />
+          </Form.Item>
+
+          <Form.Item
+            label="Password"
+            name="password"
+            rules={[
+              { required: true, message: 'Please input your password!' },
+              { min: 6, message: 'Password must be at least 6 characters!' }
+            ]}
+          >
+            <Input.Password placeholder="Enter your password" />
+          </Form.Item>
+
+          <Form.Item
+            label="Birth Date"
+            name="birthdate"
+            rules={[{ required: true, message: 'Please select your birth date!' }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              loading={loading}
+              style={{ width: '100%' }}
+            >
+              Register
+            </Button>
+          </Form.Item>
+
+          <div style={{ textAlign: 'center' }}>
+            Already have an account?{' '}
+            <Link href="/login" style={{ color: '#1890ff' }}>
+              Login now
+            </Link>
+          </div>
+        </Form>
       </div>
     </div>
   );
