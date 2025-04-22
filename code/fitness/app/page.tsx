@@ -1,11 +1,14 @@
-import Image from "next/image";
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from "next/link";
 
-export default function Home() {
-  return (
-    <main>
-      <h1>hello world</h1>
-      <Link href="/member/appointment">appointment</Link>
-    </main>
-  );
+
+export default function RootRedirectPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace('/home') 
+  }, [router])
 }

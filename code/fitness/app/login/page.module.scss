@@ -1,0 +1,105 @@
+.loginArea {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    width: 100vw;
+    height: 100vw;
+    background-color: rgba($color: #000000, $alpha: 0.3);
+}
+
+.loginBox {
+    width: 320px;
+    height: 400px;
+    background-color: #fff;
+    position: relative;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%,-50%);
+    padding: 20px;
+
+    input {
+        width: 100%;
+        height: 37px;
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #888;
+        outline: none;
+    }
+    input:focus {
+        border: 1px solid #1e80ff
+    }
+
+}
+
+.loginTitle {
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    .close {
+        color: #888;
+        cursor: pointer;
+    }
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 15px; 
+    margin-top: 15px;
+    
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 10px;
+    }
+  }
+
+.loginBtn {
+    flex: 1;
+    :global(.ant-btn) {
+        height: 40px;
+        line-height: 40px;
+        border-radius: 5px;
+        margin-top: 15px;
+        background-color: #098fe1;
+        color: #fff;
+        text-align: center;
+        cursor: pointer;
+
+        &:hover {
+            background-color: darken(#098fe1, 10%);
+            transform: translateY(-1px);
+          }
+    }
+}
+
+.regBtn {
+    flex: 1;
+    :global(.ant-btn) {
+        height: 40px;
+        line-height: 40px;
+        border-radius: 5px;
+        margin-top: 15px;
+        background-color: #378fc6;
+        color: #fff;
+        text-align: center;
+        cursor: pointer;
+
+        &:hover {
+            background-color: darken(#098fe1, 10%);
+            transform: translateY(-1px);
+          }
+    }
+}
+
+.otherLogin {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #1e80ff;
+    cursor: pointer;
+}
