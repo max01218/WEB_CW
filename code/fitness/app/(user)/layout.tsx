@@ -5,26 +5,31 @@ import { Layout, Menu, theme,Button, Flex } from 'antd';
 import Image from 'next/image';
 import Login from '../login/page'
 import { usePathname,useRouter } from 'next/navigation';
-import styles from '../(user)/home/page.module.scss'
-
+import styles from '@/app/login/page.module.scss'
+import { LoginModalContext } from "@/app/components/LoginModalContext";
 
 const { Header, Content, Footer } = Layout;
 
 const items = [
   {
-    key: 'membership',
-    label: 'Membership',
-    path: '/member'
+    key: 'home',
+    label: 'Home',
+    path: '/home' 
+  },
+  {
+    key: 'personal trainer',
+    label: 'Personal trainer',
+    path: '/trainer' 
   },
   {
     key: 'class',
-    label: 'classes and sessions', 
+    label: 'Classes and sessions', 
     path: '/course'
   },
   {
-    key: 'about',
-    label: 'Gym',
-    path: '/gym' 
+    key: 'membership',
+    label: 'Membership',
+    path: '/member'
   },
 ];
 
@@ -40,8 +45,8 @@ export default function RootLayout({
   const [isShowLogin, setIsShowLogin] = useState(false);
   const pathname = usePathname();
 
-  const handleLongin = () => setIsShowLogin(true);
-  const handleClose = () => setIsShowLogin(false);
+  const showLogin = () => setIsShowLogin(true);
+  const hideLogin = () => setIsShowLogin(false);
 
   const handleMenuClick = (e: { key: string }) => {
     const target = items.find(item => item.key === e.key)?.path;
@@ -49,13 +54,15 @@ export default function RootLayout({
   };
 
   return (
+    <LoginModalContext.Provider value={{ showLogin }}>
     <Layout>
       <Header style={{ 
         display: 'flex', 
         alignItems: 'center',
-        padding: '0 24px' 
+        padding: '0 24px' ,
+        position: 'relative', // Provide a reference for positioning sub-elements
+        overflow: 'visible'    // Allow the login box to overflow
       }}>
-        {/* Header 内容保持不变 */}
         <div className="demo-logo" style={{
           marginRight: 40,
           display: 'flex',
@@ -67,7 +74,7 @@ export default function RootLayout({
           width={120}
           height={40}
         />
-        <h1 className="site-title">Fitness Training System</h1>
+        {/* <h1 className="site-title">Fitness Training System</h1> */}
         <Menu
           theme="dark"
           mode="horizontal"
@@ -82,9 +89,9 @@ export default function RootLayout({
           }}
         />
         <Flex gap="small" wrap className={styles.operationArea}>
-          <Button type='primary' onClick={handleLongin}>Login</Button>
+          <Button type='primary' onClick={showLogin}>Login</Button>
         </Flex>
-        <Login isShow={isShowLogin} onClose={handleClose} />
+        <Login isShow={isShowLogin} onClose={hideLogin} />
       </Header>
       
       <Content style={{ padding: '0 48px' }}>
@@ -102,6 +109,7 @@ export default function RootLayout({
         Ant Design ©{new Date().getFullYear()} Created by Ant UED
       </Footer>
     </Layout>
+     </LoginModalContext.Provider>
   );
 }
 
