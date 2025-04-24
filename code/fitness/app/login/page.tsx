@@ -71,9 +71,8 @@ const Login = (props : Iprops) => {
           break;
         case 'member':
           router.push('/member/dashboard'); 
-          break;
         default:
-          throw new Error('Invalid user role');
+          router.push('/member/dashboard'); 
       }
 
       onClose();
