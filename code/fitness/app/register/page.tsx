@@ -61,7 +61,8 @@ const Register = () => {
         role: 'member',
         status: 'active',
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        appointmentStatus: false
       });
 
       message.success('Registration successful!');

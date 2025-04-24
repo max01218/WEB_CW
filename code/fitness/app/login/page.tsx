@@ -60,12 +60,20 @@ const Login = (props : Iprops) => {
       const userData = userDoc.data();
       const role = userData?.role || 'member';
 
-      if (role === 'admin') {
-        router.push('/member/dashboard');
-        console.log("admin跳转")
-      } else {
-        router.push('/home');
-        console.log("member跳转到home")
+      switch (role) {
+        case 'admin':
+          // 应该跳转到管理员的界面目前也没有
+          router.push('/member/dashboard'); 
+          break;
+        case 'trainer':
+          // 应该跳转到教练的界面目前没有
+          router.push('/member/appointment'); 
+          break;
+        case 'member':
+          // Refresh：router.replace(window.location.pathname);
+          break;
+        default:
+          throw new Error('Invalid user role');
       }
 
       onClose();
@@ -113,7 +121,6 @@ const Login = (props : Iprops) => {
 
   return isShow ? (
     <LoginBoxWrapper onClose={handleClose}>
-      {error && <div className={styles.error}>{error}</div>}
       <input
         name="email"
         type="email"
@@ -128,6 +135,7 @@ const Login = (props : Iprops) => {
         value={form.password}
         onChange={handleFromChange}
       />
+      {error && <div className={styles.error}>{error}</div>}
       <Button
         className={styles.loginBtn}
         onClick={handleLogin}
