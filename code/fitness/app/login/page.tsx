@@ -70,7 +70,7 @@ const Login = (props : Iprops) => {
           router.push('/member/appointment'); 
           break;
         case 'member':
-          // Refresh：router.replace(window.location.pathname);
+          router.push('/member/dashboard'); 
           break;
         default:
           throw new Error('Invalid user role');
