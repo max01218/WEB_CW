@@ -14,7 +14,8 @@ import {
   LogoutOutlined,
   TrophyOutlined,
   CheckOutlined,
-  PlusOutlined
+  PlusOutlined,
+  EditOutlined
 } from "@ant-design/icons";
 import { collection, query, where, getDocs, Timestamp, onSnapshot, orderBy, addDoc } from 'firebase/firestore';
 import { ref, onValue, update } from 'firebase/database';
@@ -382,6 +383,10 @@ const DashboardPage = () => {
     }
   };
 
+  const handleEditProfile = () => {
+    router.push('/member/profile');
+  };
+
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
@@ -394,9 +399,19 @@ const DashboardPage = () => {
               <Title level={2} style={titleStyle}>
                 Member Dashboard
               </Title>
-              <span style={welcomeTextStyle}>
-                Welcome back, {memberData?.name || 'Member'}!
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={welcomeTextStyle}>
+                  Welcome back, {memberData?.name || 'Member'}!
+                </span>
+                <Button 
+                  type="link" 
+                  icon={<EditOutlined />} 
+                  onClick={handleEditProfile}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  Edit Profile
+                </Button>
+              </div>
             </div>
           </div>
           <div style={headerActionsStyle}>

@@ -29,6 +29,9 @@ const AdminDashboard = () => {
     margin: '0 auto',
     padding: '24px',
     position: 'relative' as const,
+    backgroundColor: '#001529', // 深色背景
+    minHeight: '100vh',
+    color: '#fff', // 白色文字
   };
 
   const logoutButtonStyle = {
@@ -38,6 +41,16 @@ const AdminDashboard = () => {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    color: '#fff', // 白色文字
+  };
+
+  const cardStyle = {
+    backgroundColor: '#002140', // 深色卡片背景
+    borderColor: '#003a8c', // 深色边框
+  };
+
+  const textStyle = {
+    color: '#fff', // 白色文字
   };
 
   const handleLogout = async () => {
@@ -94,12 +107,11 @@ const AdminDashboard = () => {
         icon={<LogoutOutlined />} 
         onClick={handleLogout}
         style={logoutButtonStyle}
-        danger
       >
         Logout
       </Button>
       
-      <Title level={2} style={{ marginBottom: '24px' }}>Appointment Applications</Title>
+      <Title level={2} style={{ marginBottom: '24px', color: '#fff' }}>Appointment Applications</Title>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -111,12 +123,12 @@ const AdminDashboard = () => {
           dataSource={members}
           renderItem={(member: Member) => (
             <List.Item>
-              <Card>
+              <Card style={cardStyle}>
                 <div style={{ marginBottom: '16px' }}>
-                  <Title level={4}>{member.name}</Title>
-                  <Text type="secondary">Email: {member.email}</Text>
+                  <Title level={4} style={textStyle}>{member.name}</Title>
+                  <Text style={textStyle}>Email: {member.email}</Text>
                   <br />
-                  <Text type="secondary">
+                  <Text style={textStyle}>
                     Birth Date: {dayjs(member.birthdate).format('YYYY-MM-DD')}
                   </Text>
                 </div>
@@ -140,7 +152,13 @@ const AdminDashboard = () => {
               </Card>
             </List.Item>
           )}
-          locale={{ emptyText: 'No pending appointments' }}
+          locale={{ 
+            emptyText: (
+              <div style={{ color: '#fff', textAlign: 'center', padding: '24px' }}>
+                No pending appointments
+              </div>
+            ) 
+          }}
         />
       )}
     </div>
