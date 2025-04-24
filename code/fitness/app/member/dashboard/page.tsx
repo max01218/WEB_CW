@@ -22,6 +22,7 @@ import { db, database } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { doc, updateDoc } from 'firebase/firestore';
+import { withAuth } from '@/app/components/withAuth';
 import {
   containerStyle,
   contentStyle,
@@ -68,7 +69,7 @@ const encodeEmail = (email: string) => {
   return email.replace(/[.@]/g, '_');
 };
 
-export default function DashboardPage() {
+const DashboardPage = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalTrainingMinutes: 0,
     upcomingAppointments: 0,
@@ -598,4 +599,6 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
+};
+
+export default withAuth(DashboardPage, { requiredRole: 'member' });

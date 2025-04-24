@@ -1,7 +1,7 @@
 'use client'
 import React from 'react';
 import Link from 'next/link';
-import { UserOutlined, LoginOutlined, AppstoreOutlined, TrophyOutlined, TeamOutlined, CalendarOutlined } from '@ant-design/icons';
+import { UserOutlined, LoginOutlined, AppstoreOutlined, TrophyOutlined, TeamOutlined, CalendarOutlined, TeamOutlined as TrainerOutlined } from '@ant-design/icons';
 import {
   containerStyle,
   headerStyle,
@@ -28,8 +28,18 @@ const HomePage = () => {
   return (
     <div style={containerStyle}>
       <header style={headerStyle}>
-        <div style={logoStyle}>
-          <AppstoreOutlined /> Fitness Tracker
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={logoStyle}>
+            <AppstoreOutlined /> Fitness Tracker
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Link href="/course" className="nav-link">
+              <UserOutlined /> Classes
+            </Link>
+            <Link href="/trainer_search" className="nav-link">
+              <TrainerOutlined /> Trainer
+            </Link>
+          </div>
         </div>
         <nav style={navStyle}>
           <Link href="/login" className="nav-link">

@@ -5,6 +5,7 @@ import { Card, Row, Col, Button, Typography } from 'antd';
 import { UserAddOutlined, HistoryOutlined, CalendarOutlined, LogoutOutlined } from '@ant-design/icons';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { withAuth } from '../components/withAuth';
 
 const { Title } = Typography;
 
@@ -137,4 +138,4 @@ const TrainerPage = () => {
   );
 };
 
-export default TrainerPage; 
+export default withAuth(TrainerPage, { requiredRole: 'trainer' }); 
