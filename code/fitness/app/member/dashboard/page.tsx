@@ -15,7 +15,8 @@ import {
   TrophyOutlined,
   CheckOutlined,
   PlusOutlined,
-  EditOutlined
+  EditOutlined,
+  EnvironmentOutlined
 } from "@ant-design/icons";
 import { collection, query, where, getDocs, Timestamp, onSnapshot, orderBy, addDoc } from 'firebase/firestore';
 import { ref, onValue, update } from 'firebase/database';
@@ -46,6 +47,7 @@ import {
   navCardDescStyle,
   navCardDotStyle
 } from './styles';
+import FitnessMap from '@/app/components/FitnessMap';
 
 const { Title, Text } = Typography;
 
@@ -387,6 +389,19 @@ const DashboardPage = () => {
     router.push('/member/profile');
   };
 
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
@@ -539,7 +554,7 @@ const DashboardPage = () => {
 
         {/* Navigation cards */}
         <Row gutter={[24, 24]}>
-          <Col xs={24} sm={12}>
+          <Col xs={24} sm={8}>
             <Link href="/member/appointment" style={{ textDecoration: 'none' }}>
               <Card 
                 hoverable 
@@ -564,7 +579,7 @@ const DashboardPage = () => {
               </Card>
             </Link>
           </Col>
-          <Col xs={24} sm={12}>
+          <Col xs={24} sm={8}>
             <Link href="/member/history" style={{ textDecoration: 'none' }}>
               <Card 
                 hoverable 
@@ -585,6 +600,31 @@ const DashboardPage = () => {
                 <div style={navCardDescStyle}>
                   <div style={navCardDotStyle} />
                   Track your progress
+                </div>
+              </Card>
+            </Link>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Link href="/member/map" style={{ textDecoration: 'none' }}>
+              <Card 
+                hoverable 
+                className="nav-card nav-card-green"
+              >
+                <div style={navCardIconStyle}>
+                  <EnvironmentOutlined />
+                </div>
+                <Statistic
+                  title={
+                    <span style={navCardTitleStyle}>
+                      Fitness Centers
+                    </span>
+                  }
+                  value="View Map"
+                  valueStyle={navCardValueStyle}
+                />
+                <div style={navCardDescStyle}>
+                  <div style={navCardDotStyle} />
+                  Find nearby fitness centers
                 </div>
               </Card>
             </Link>
