@@ -82,6 +82,7 @@ const RegisterPage = () => {
           email: result.user.email,
           name: result.user.displayName || 'User',
           birthdate: null,
+          address: '',
           appointmentStatus: false,
           role: 'member',
           status: 'active',
@@ -133,6 +134,7 @@ const RegisterPage = () => {
         email: values.email,
         name: values.name,
         birthdate: dayjs(values.birthdate).format('YYYY-MM-DD'),
+        address: values.address || '',
         appointmentStatus: false,
         role: 'member',
         status: 'active',
@@ -218,6 +220,17 @@ const RegisterPage = () => {
             rules={[{ required: true, message: 'Please select your birth date!' }]}
           >
             <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item
+            label="Address"
+            name="address"
+            rules={[{ required: true, message: 'Please enter your address!' }]}
+          >
+            <Input.TextArea 
+              placeholder="Enter your address" 
+              autoSize={{ minRows: 2, maxRows: 4 }}
+            />
           </Form.Item>
 
           <Form.Item>

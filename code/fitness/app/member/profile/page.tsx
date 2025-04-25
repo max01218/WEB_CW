@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Form, Input, Button, message, Card, DatePicker } from 'antd';
-import { UserOutlined, MailOutlined, CalendarOutlined } from '@ant-design/icons';
+import { UserOutlined, MailOutlined, CalendarOutlined, HomeOutlined } from '@ant-design/icons';
 import { auth, db } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -23,6 +23,7 @@ const ProfilePage = () => {
         name: memberData.name,
         email: memberData.email,
         birthday: memberData.birthday ? dayjs(memberData.birthday) : null,
+        address: memberData.address || '',
       });
     };
     
@@ -41,6 +42,7 @@ const ProfilePage = () => {
       const updateData = {
         name: values.name,
         birthday: values.birthday ? values.birthday.toDate() : null,
+        address: values.address || '',
         updatedAt: new Date()
       };
 
@@ -113,6 +115,18 @@ const ProfilePage = () => {
               placeholder="Select birthday"
               format="YYYY-MM-DD"
               prefix={<CalendarOutlined />}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="address"
+            label="Address"
+            rules={[{ required: true, message: 'Please enter your address!' }]}
+          >
+            <Input.TextArea 
+              placeholder="Enter your address"
+              size="large"
+              autoSize={{ minRows: 2, maxRows: 4 }}
             />
           </Form.Item>
 

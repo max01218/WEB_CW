@@ -19,6 +19,7 @@ interface MemberData {
   role: 'member' | 'trainer' | 'admin';
   status: 'active' | 'inactive';
   birthday?: Date | null;
+  address?: string;
   createdAt: any;
   updatedAt: any;
 }
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: 'member',
         status: 'active',
         birthday: null,
+        address: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -144,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: 'member',
         status: 'active',
         birthday: null,
+        address: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

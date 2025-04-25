@@ -150,6 +150,13 @@ const LoginPage = () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
+      // 检查邮箱是否已验证
+      if (!userCredential.user.emailVerified) {
+        message.error('Please verify your email before logging in. Check your inbox for the verification link.');
+        router.push('/home');
+        return;
+      }
+      
       const userRole = await getUserRole(email);
       message.success('Login successful!');
       
@@ -163,8 +170,12 @@ const LoginPage = () => {
         default:
           router.push('/member/dashboard');
       }
-    } catch (error) {
-      message.error('Login failed. Please check your credentials.');
+    } catch (error: any) {
+      if (error.code === 'auth/invalid-credential') {
+        message.error('Invalid email or password.');
+      } else {
+        message.error('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
