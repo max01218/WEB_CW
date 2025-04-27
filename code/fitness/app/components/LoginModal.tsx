@@ -53,6 +53,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ visible, onClose }) => {
 
         await setDoc(userRef, userData);
         message.success('Account created successfully!');
+        message.warning('Your appointment request is pending approval. Please wait for admin approval.');
+        router.push('/home');
+        return;
+      } else {
+        const userData = userSnap.data();
+        if (!userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
       }
 
       message.success('Login successful!');
@@ -85,6 +95,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ visible, onClose }) => {
         message.error('Please verify your email first. Check your inbox for the verification link.');
         router.push('/home');
         return;
+      }
+
+      // 获取用户数据
+      const userRef = doc(db, 'members', userCredential.user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (!userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
       }
       
       message.success('Login successful!');

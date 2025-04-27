@@ -83,17 +83,13 @@ const LoginPage = () => {
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      
       const result = await signInWithPopup(auth, provider);
-      
       if (!result.user) {
         throw new Error('No user data returned');
       }
-
       // 检查用户是否已存在
       const userRef = doc(db, 'members', result.user.uid);
       const userSnap = await getDoc(userRef);
-
       if (!userSnap.exists()) {
         // 创建新用户数据
         const userData = {
@@ -108,15 +104,20 @@ const LoginPage = () => {
           uid: result.user.uid,
           emailVerified: true,
         };
-
         await setDoc(userRef, userData);
         message.success('Account created successfully!');
-        router.push('/member/dashboard');
+        message.warning('Your appointment request is pending approval. Please wait for admin approval.');
+        router.push('/home');
+        return;
       } else {
         const userData = userSnap.data();
         const role = userData.role || 'member';
+        if (role !== 'admin' && !userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
         message.success('Login successful!');
-        
         switch (role) {
           case 'admin':
             router.push('/admin/dashboard');
@@ -149,28 +150,37 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
       // 检查邮箱是否已验证
       if (!userCredential.user.emailVerified) {
         message.error('Please verify your email before logging in. Check your inbox for the verification link.');
         router.push('/home');
         return;
       }
-      
-      const userRole = await getUserRole(email);
-      message.success('Login successful!');
-      
-      switch (userRole) {
-        case 'admin':
-          router.push('/admin/dashboard');
-          break;
-        case 'trainer':
-          router.push('/trainer');
-          break;
-        default:
-          router.push('/member/dashboard');
+      // 获取用户数据
+      const userRef = doc(db, 'members', userCredential.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const role = userData.role || 'member';
+        if (role !== 'admin' && !userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
+        message.success('Login successful!');
+        switch (role) {
+          case 'admin':
+            router.push('/admin/dashboard');
+            break;
+          case 'trainer':
+            router.push('/trainer');
+            break;
+          default:
+            router.push('/member/dashboard');
+        }
       }
     } catch (error: any) {
+      console.error('帳密登入錯誤:', error);
       if (error.code === 'auth/invalid-credential') {
         message.error('Invalid email or password.');
       } else {

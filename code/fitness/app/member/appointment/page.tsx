@@ -3,7 +3,7 @@
 import { Table, Button, message, Spin, Tag } from "antd";
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, query, where, Timestamp, updateDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, query, where, Timestamp, updateDoc, addDoc, onSnapshot } from "firebase/firestore";
 import { ref, push } from 'firebase/database';
 import { db, database } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
@@ -37,7 +37,7 @@ export default function AppointmentsPage() {
       const appointmentsQuery = query(
         collection(db, "appointments"),
         where("email", "==", memberData.email),
-        where("status", "in", ["scheduled", "completed"])
+        where("status", "==", "scheduled")
       );
 
       const querySnapshot = await getDocs(appointmentsQuery);
@@ -49,16 +49,8 @@ export default function AppointmentsPage() {
         updatedAt: doc.data().updatedAt
       })) as Appointment[];
 
-      // 按日期排序
-      appointmentsData.sort((a, b) => {
-        const dateA = a.appointmentDate instanceof Timestamp ? 
-          a.appointmentDate.toDate() : new Date(a.appointmentDate);
-        const dateB = b.appointmentDate instanceof Timestamp ? 
-          b.appointmentDate.toDate() : new Date(b.appointmentDate);
-        return dateA.getTime() - dateB.getTime();
-      });
-
-      setAppointments(appointmentsData);
+      // 只顯示 scheduled 狀態
+      setAppointments(appointmentsData.filter(item => item.status === "scheduled"));
     } catch (error) {
       console.error("Error fetching appointments:", error);
       message.error("Failed to fetch appointment data.");
@@ -74,19 +66,16 @@ export default function AppointmentsPage() {
     }
     
     try {
-      // 计算两週後的日期
-      const twoWeeksLater = new Date();
-      twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
-      
-      // 設置時間為上午 10:00
-      twoWeeksLater.setHours(10, 0, 0, 0);
+      // 计算5分钟后的时间
+      const fiveMinutesLater = new Date();
+      fiveMinutesLater.setMinutes(fiveMinutesLater.getMinutes() + 5);
       
       const testAppointment = {
         email: memberData.email,
         trainerId: "trainer123",
-        appointmentDate: Timestamp.fromDate(twoWeeksLater),
+        appointmentDate: Timestamp.fromDate(fiveMinutesLater),
         status: "scheduled" as const,
-        remarks: "Test appointment",
+        remarks: "Test appointment (5 minutes later)",
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
@@ -99,7 +88,7 @@ export default function AppointmentsPage() {
         id: appointmentRef.id,
         email: memberData.email,
         trainerId: "trainer123",
-        appointmentDate: Timestamp.fromDate(twoWeeksLater),
+        appointmentDate: Timestamp.fromDate(fiveMinutesLater),
         status: "scheduled",
         remarks: "Test appointment",
       };
@@ -109,7 +98,7 @@ export default function AppointmentsPage() {
       const notification = {
         email: memberData.email,
         title: "New Appointment Reminder",
-        description: `You have successfully scheduled a training session for ${twoWeeksLater.toLocaleString()}`,
+        description: `You have successfully scheduled a training session for ${fiveMinutesLater.toLocaleString()}`,
         date: new Date().toISOString(),
         type: "appointment",
         read: false,
@@ -175,6 +164,73 @@ export default function AppointmentsPage() {
       fetchAppointments();
     }
   };
+
+  // 添加定时检查预约的函数
+  const checkAndUpdateAppointments = async () => {
+    console.log("checking appointments...");
+    try {
+      if (!user || !memberData) return;
+
+      const now = Timestamp.now();
+      const appointmentsQuery = query(
+        collection(db, "appointments"),
+        where("email", "==", memberData.email),
+        where("status", "==", "scheduled")
+      );
+
+      const querySnapshot = await getDocs(appointmentsQuery);
+      
+      for (const doc of querySnapshot.docs) {
+        const appointment = doc.data();
+        
+        // 创建训练记录
+        const trainingRecord = {
+          email: appointment.email,
+          trainerId: appointment.trainerId,
+          sessionDate: appointment.appointmentDate,
+          status: 'completed',
+          duration: 60, // 默认训练时长为60分钟
+          createdAt: now,
+          updatedAt: now
+        };
+
+        // 添加训练记录
+        await addDoc(collection(db, "trainingRecords"), trainingRecord);
+
+        // 更新预约状态为已完成
+        await updateDoc(doc.ref, {
+          status: "completed",
+          updatedAt: now
+        });
+
+        // 创建通知
+        const notification = {
+          email: appointment.email,
+          title: "Training Session Completed",
+          description: `Your training session on ${appointment.appointmentDate.toDate().toLocaleString()} has been completed and recorded.`,
+          date: now,
+          type: "training",
+          read: false,
+          createdAt: now
+        };
+
+        await addDoc(collection(db, "notifications"), notification);
+      }
+    } catch (error) {
+      console.error("Error checking appointments:", error);
+    }
+  };
+
+  // 添加定时器
+  useEffect(() => {
+    // 立即执行一次检查
+    checkAndUpdateAppointments();
+    
+    // 每分钟检查一次
+    const interval = setInterval(checkAndUpdateAppointments, 60000);
+    
+    return () => clearInterval(interval);
+  }, [user, memberData]);
 
   useEffect(() => {
     if (!authLoading) {
