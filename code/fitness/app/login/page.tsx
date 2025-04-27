@@ -83,17 +83,13 @@ const LoginPage = () => {
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      
       const result = await signInWithPopup(auth, provider);
-      
       if (!result.user) {
         throw new Error('No user data returned');
       }
-
       // 检查用户是否已存在
       const userRef = doc(db, 'members', result.user.uid);
       const userSnap = await getDoc(userRef);
-
       if (!userSnap.exists()) {
         // 创建新用户数据
         const userData = {
@@ -108,15 +104,20 @@ const LoginPage = () => {
           uid: result.user.uid,
           emailVerified: true,
         };
-
         await setDoc(userRef, userData);
         message.success('Account created successfully!');
-        router.push('/member/dashboard');
+        message.warning('Your appointment request is pending approval. Please wait for admin approval.');
+        router.push('/home');
+        return;
       } else {
         const userData = userSnap.data();
         const role = userData.role || 'member';
+        if (role !== 'admin' && !userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
         message.success('Login successful!');
-        
         switch (role) {
           case 'admin':
             router.push('/admin/dashboard');
@@ -182,61 +183,70 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
       // 检查邮箱是否已验证
       if (!userCredential.user.emailVerified) {
         message.error('Please verify your email before logging in. Check your inbox for the verification link.');
         router.push('/home');
         return;
       }
-      
-      const userRole = await getUserRole(email);
-      message.success('Login successful!');
-      
-      switch (userRole) {
-        case 'admin':
-          router.push('/admin/dashboard');
-          break;
-        case 'trainer':
-          router.push('/trainer');
-          break;
-        default:
-          try {
-            const requestsQuery = query(
-              collection(db, 'requests'),
-              where('memberName', '==', email),
-              limit(1)
-            );
-            const requestsSnapshot = await getDocs(requestsQuery);
-        
-            if (!requestsSnapshot.empty) {
-              const requestDoc = requestsSnapshot.docs[0];
-              const requestData = requestDoc.data();
-              const status = requestData.status;
-        
-              if (status === 'rejected') {
-                message.success('You have been rejected. Please choose again.');
-                router.push('/trainer_search');
-              } else if (status === 'accepted') {
-                message.success('Please check the course.');
-                router.push('/member/dashboard');
+      // 获取用户数据
+      const userRef = doc(db, 'members', userCredential.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const role = userData.role || 'member';
+        if (role !== 'admin' && !userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
+        message.success('Login successful!');
+        switch (role) {
+          case 'admin':
+            router.push('/admin/dashboard');
+            break;
+          case 'trainer':
+            router.push('/trainer');
+            break;
+          default:
+            try {
+              const requestsQuery = query(
+                collection(db, 'requests'),
+                where('memberName', '==', email),
+                limit(1)
+              );
+              const requestsSnapshot = await getDocs(requestsQuery);
+          
+              if (!requestsSnapshot.empty) {
+                const requestDoc = requestsSnapshot.docs[0];
+                const requestData = requestDoc.data();
+                const status = requestData.status;
+          
+                if (status === 'rejected') {
+                  message.success('You have been rejected. Please choose again.');
+                  router.push('/trainer_search');
+                } else if (status === 'accepted') {
+                  message.success('Please check the course.');
+                  router.push('/member/dashboard');
+                } else {
+                  message.success('The request is still under review.');
+                  router.push('/trainer_search');
+                }
               } else {
-                message.success('The request is still under review.');
+                // 没有request记录
+                message.success('Please choose your personal trainer.');
                 router.push('/trainer_search');
               }
-            } else {
-              // 没有request记录
-              message.success('Please choose your personal trainer.');
+            } catch (error) {
+              console.error('Error checking request status:', error);
+              message.error('Failed to check request status. Please try again.');
               router.push('/trainer_search');
             }
-          } catch (error) {
-            console.error('Error checking request status:', error);
-            message.error('Failed to check request status. Please try again.');
-            router.push('/trainer_search');
-          }
-          break;
+            break;
+        }
       }
     } catch (error: any) {
+      console.error('帳密登入錯誤:', error);
       if (error.code === 'auth/invalid-credential') {
         message.error('Invalid email or password.');
       } else {

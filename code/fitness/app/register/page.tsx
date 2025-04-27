@@ -94,11 +94,19 @@ const RegisterPage = () => {
 
         await setDoc(userRef, userData);
         message.success('Account created successfully!');
+        message.warning('Your appointment request is pending approval. Please wait for admin approval.');
+        router.push('/home');
+        return;
       } else {
+        const userData = userSnap.data();
+        if (!userData.appointmentStatus) {
+          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
+          router.push('/home');
+          return;
+        }
         message.success('Welcome back!');
+        router.push('/member/dashboard');
       }
-
-      router.push('/member/dashboard');
     } catch (error: any) {
       console.error('Google sign in error:', error);
       if (error.code === 'auth/operation-not-allowed') {
