@@ -125,7 +125,40 @@ const LoginPage = () => {
             router.push('/trainer');
             break;
           default:
-            router.push('/member/dashboard');
+            try {
+              const requestsQuery = query(
+                collection(db, 'requests'),
+                where('memberName', '==', result.user.email),
+                limit(1)
+              );
+              const requestsSnapshot = await getDocs(requestsQuery);
+          
+              if (!requestsSnapshot.empty) {
+                const requestDoc = requestsSnapshot.docs[0];
+                const requestData = requestDoc.data();
+                const status = requestData.status;
+          
+                if (status === 'rejected') {
+                  message.success('You have been rejected. Please choose again.');
+                  router.push('/trainer_search');
+                } else if (status === 'accepted') {
+                  message.success('Please check the course.');
+                  router.push('/member/dashboard');
+                } else {
+                  message.success('The request is still under review.');
+                  router.push('/trainer_search');
+                }
+              } else {
+                // 没有request记录
+                message.success('Please choose your personal trainer.');
+                router.push('/trainer_search');
+              }
+            } catch (error) {
+              console.error('Error checking request status:', error);
+              message.error('Failed to check request status. Please try again.');
+              router.push('/trainer_search');
+            }
+            break;
         }
       }
     } catch (error: any) {
@@ -168,7 +201,40 @@ const LoginPage = () => {
           router.push('/trainer');
           break;
         default:
-          router.push('/member/dashboard');
+          try {
+            const requestsQuery = query(
+              collection(db, 'requests'),
+              where('memberName', '==', email),
+              limit(1)
+            );
+            const requestsSnapshot = await getDocs(requestsQuery);
+        
+            if (!requestsSnapshot.empty) {
+              const requestDoc = requestsSnapshot.docs[0];
+              const requestData = requestDoc.data();
+              const status = requestData.status;
+        
+              if (status === 'rejected') {
+                message.success('You have been rejected. Please choose again.');
+                router.push('/trainer_search');
+              } else if (status === 'accepted') {
+                message.success('Please check the course.');
+                router.push('/member/dashboard');
+              } else {
+                message.success('The request is still under review.');
+                router.push('/trainer_search');
+              }
+            } else {
+              // 没有request记录
+              message.success('Please choose your personal trainer.');
+              router.push('/trainer_search');
+            }
+          } catch (error) {
+            console.error('Error checking request status:', error);
+            message.error('Failed to check request status. Please try again.');
+            router.push('/trainer_search');
+          }
+          break;
       }
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {

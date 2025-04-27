@@ -1,17 +1,16 @@
-// app/(user)/trainer/page.tsx
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Input, Button, Card, Row, Col, Spin, message } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import Link from "next/link";
+import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space } from "antd";
+import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useLoginModal } from "@/app/components/LoginModalContext";
 
 interface Trainer {
-  id: string;            // Firestore 文档 ID
+  id: string;
   name: string;
   trainerId: string;
   intro?: string;
@@ -20,125 +19,268 @@ interface Trainer {
   image?: string;
 }
 
+const PAGE_SIZE = 5;
+
+const headerStyle: React.CSSProperties = {
+  backgroundColor: "#ffffff",
+  padding: "10px 30px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+  marginBottom: "30px",
+  position: "sticky",
+  top: 0,
+  zIndex: 1000,
+};
+
+const logoStyle: React.CSSProperties = {
+  fontSize: "22px",
+  fontWeight: "bold",
+  color: "#1890ff",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+const navStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "15px",
+};
+
 export default function TrainerPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchNamePrefix, setSearchNamePrefix] = useState("");
+  const [searchTrainerId, setSearchTrainerId] = useState("");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Trainer[]>([]);
-  const [user, setUser] = useState<null | { uid: string; email?: string }>(null);
+  const [allTrainers, setAllTrainers] = useState<Trainer[]>([]);
+  const [filteredTrainers, setFilteredTrainers] = useState<Trainer[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [user, setUser] = useState<null | { uid: string; email?: string; name?: string }>(null);
   const { showLogin } = useLoginModal();
 
-  // 监听登录状态
+  // 新增：控制弹窗
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentTrainer, setCurrentTrainer] = useState<Trainer | null>(null);
+  const [trainingGoal, setTrainingGoal] = useState("");
+
   useEffect(() => {
     const auth = getAuth();
     return onAuthStateChanged(auth, (u) => {
-      if (u) setUser({ uid: u.uid, email: u.email ?? undefined });
+      if (u) setUser({ uid: u.uid, email: u.email ?? undefined, name: u.displayName ?? undefined });
       else setUser(null);
     });
   }, []);
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
-      message.warning("Enter the name or ID of the Trainer");
-      return;
-    }
+  useEffect(() => {
+    const fetchTrainers = async () => {
+      setLoading(true);
+      try {
+        const snap = await getDocs(collection(db, "trainer"));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        setAllTrainers(list);
+        setFilteredTrainers(list);
+      } catch (e) {
+        message.error("Failed to load trainers.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTrainers();
+  }, []);
 
-    setLoading(true);
-    try {
-      const snap = await getDocs(collection(db, "trainer"));
-      const list = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-      setResults(list.filter(t => t.name.includes(searchTerm) || t.trainerId.includes(searchTerm)));
-    } catch (e) {
-      message.error("The query failed. Please try again later");
-    } finally {
-      setLoading(false);
-    }
+  const handleAdvancedSearch = () => {
+    const namePrefix = searchNamePrefix.trim().toLowerCase();
+    const trainerIdKeyword = searchTrainerId.trim().toLowerCase();
+
+    const filtered = allTrainers.filter(t => {
+      const nameMatches = namePrefix ? t.name.toLowerCase().startsWith(namePrefix) : true;
+      const idMatches = trainerIdKeyword ? t.trainerId.toLowerCase().includes(trainerIdKeyword) : true;
+      return nameMatches && idMatches;
+    });
+
+    setFilteredTrainers(filtered);
+    setCurrentPage(1);
   };
 
-   // 真正发送请求 目前只发送了教练id 请求的uid 和请求时间
-   const actuallySendRequest = useCallback(
-    async (trainer: Trainer) => {
-      try {
-        await addDoc(collection(db, "requests"), {
-          trainerId: trainer.trainerId,
-          requesterUid: user!.uid,
-          requestedAt: serverTimestamp(),
-        });
-        message.success("The training request has been sent!");
-      } catch {
-        message.error("The sending failed. Please try again");
-      }
-    },
-    [user]
-  );
-  
-  const sendRequest = async (trainer: Trainer) => {
-    console.log("sendRequest click, user =", user);
+  const openRequestModal = (trainer: Trainer) => {
     if (!user) {
       showLogin();
       return;
     }
-    actuallySendRequest(trainer);
+    setCurrentTrainer(trainer);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmitRequest = async () => {
+    if (!trainingGoal.trim()) {
+      message.warning("Please enter your training goal.");
+      return;
+    }
+    if (!user || !currentTrainer) {
+      message.error("Error: Missing user or trainer information.");
+      return;
+    }
+    try {
+      await addDoc(collection(db, "requests"), {
+        memberId: user.uid,
+        memberName: user.name || user.email || "Anonymous",
+        trainerId: currentTrainer.trainerId,
+        trainerName: currentTrainer.name,
+        trainingGoal,
+        requestedAt: serverTimestamp(),
+      });
+      message.success("Training request sent successfully!");
+      setIsModalOpen(false);
+      setTrainingGoal("");
+    } catch (error) {
+      message.error("Failed to send request.");
+    }
+  };
+
+  const currentPageData = filteredTrainers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.src = "/images/trainer.jpg";
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: "40px auto", padding: "0 20px" }}>
-      <Row gutter={16} style={{ marginBottom: 20 }}>
-        <Col flex="auto">
-          <Input
-            placeholder="Enter the name or ID of the Trainer"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            onPressEnter={handleSearch}
-            suffix={<SearchOutlined onClick={handleSearch} style={{ cursor: "pointer" }} />}
-          />
-        </Col>
-        <Col>
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={handleSearch}
-            loading={loading}
-          >
-            Search
-          </Button>
-        </Col>
-      </Row>
+    <div>
+      {/* 顶部 Header */}
+      <header style={headerStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={logoStyle}>
+            <AppstoreOutlined /> Fitness Tracker
+          </div>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <Link href="/course" className="nav-link" style={{ color: "#555", fontWeight: 500 }}>
+              <UserOutlined /> Classes
+            </Link>
+            <Link href="/trainer_search" className="nav-link" style={{ color: "#555", fontWeight: 500 }}>
+              🏋️ Trainer
+            </Link>
+          </div>
+        </div>
+        <nav style={navStyle}>
+          <Link href="/login" className="nav-link" style={{ color: "#1890ff", fontWeight: 500 }}>
+            Login
+          </Link>
+          <Link href="/register" className="nav-link" style={{ color: "#1890ff", fontWeight: 500 }}>
+            Register
+          </Link>
+        </nav>
+      </header>
 
-      <Spin spinning={loading} tip="Loading...">
-        {results.map(trainer => (
-          <Card key={trainer.id} style={{ marginBottom: 20 }}>
-            <Row>
-              <Col span={6}>
-                <img src={trainer.image || "@/public/images/trainer.jpg"} style={{ width: "100%" }} />
-              </Col>
-              <Col span={18} style={{ padding: 16 }}>
-                <h3>{trainer.name}</h3>
-                <p><strong>Trainer ID:</strong>{trainer.trainerId}</p>
-                {trainer.intro && (
-                  <p><strong>Introduction:</strong>{trainer.intro}</p>
-                )}
-                {trainer.email && (
-                  <p><strong>Email:</strong>{trainer.email}</p>
-                )}
-                {trainer.telephone && (
-                  <p><strong>telephone:</strong>{trainer.telephone}</p>
-                )}
-                <Button
-                  type="primary"
-                  onClick={() => sendRequest(trainer)}
-                  style={{ marginTop: 12 }}
-                >
-                  {user ? "Send the training request" : "Login to send request"}
-                </Button>
-              </Col>
-            </Row>
-          </Card>
-        ))}
-      </Spin>
+      {/* 页面主体内容 */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 20px" }}>
+        <Space direction="vertical" style={{ width: "100%", marginBottom: 20 }}>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Input
+                placeholder="Filter by Name Prefix (e.g., A)"
+                value={searchNamePrefix}
+                onChange={e => setSearchNamePrefix(e.target.value)}
+                allowClear
+              />
+            </Col>
+            <Col span={8}>
+              <Input
+                placeholder="Filter by Trainer ID Keyword"
+                value={searchTrainerId}
+                onChange={e => setSearchTrainerId(e.target.value)}
+                allowClear
+              />
+            </Col>
+            <Col span={8}>
+              <Button
+                type="primary"
+                icon={<UserOutlined />}
+                onClick={handleAdvancedSearch}
+                loading={loading}
+                block
+              >
+                Advanced Search
+              </Button>
+            </Col>
+          </Row>
+        </Space>
 
-      {!loading && results.length === 0 && (
-        <p>There is no matching Trainer for the time being.</p>
-      )}
+        <Spin spinning={loading} tip="Loading..." size="large">
+          {currentPageData.length > 0 ? (
+            currentPageData.map(trainer => (
+              <Card key={trainer.id} style={{ marginBottom: 20 }}>
+                <Row>
+                <Col span={6} style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                    <img
+                      src={trainer.image || "/images/trainer.jpg"} // 注意路径问题
+                      style={{
+                        width: "180px",   // 固定宽度更好控制，比如180px
+                        height: "240px",  // 固定高度，保持比例
+                        objectFit: "cover",  // 裁剪图片让他填满，不变形
+                        borderRadius: "8px", // 圆角，让图片更好看
+                        boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)" // 加点阴影更有立体感
+                      }}
+                      alt="Trainer"
+                    />
+                  </Col>
+                  <Col span={18} style={{ padding: 16 }}>
+                    <h3>{trainer.name}</h3>
+                    <p><strong>Trainer ID:</strong> {trainer.trainerId}</p>
+                    {trainer.intro && <p><strong>Introduction:</strong> {trainer.intro}</p>}
+                    {trainer.email && <p><strong>Email:</strong> {trainer.email}</p>}
+                    {trainer.telephone && <p><strong>Telephone:</strong> {trainer.telephone}</p>}
+                    <Button
+                      type="primary"
+                      onClick={() => openRequestModal(trainer)}
+                      style={{ marginTop: 12 }}
+                    >
+                      {user ? "Send the training request" : "Login to send request"}
+                    </Button>
+                  </Col>
+                </Row>
+              </Card>
+            ))
+          ) : (
+            !loading && (
+              <Empty
+                description="No matching trainers found."
+                style={{ marginTop: 50 }}
+              />
+            )
+          )}
+        </Spin>
+
+        {filteredTrainers.length > 0 && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <Pagination
+              current={currentPage}
+              pageSize={PAGE_SIZE}
+              total={filteredTrainers.length}
+              onChange={(page) => setCurrentPage(page)}
+              showSizeChanger={false}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 输入训练目标的 Modal */}
+      <Modal
+        title="Submit your training goal"
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onOk={handleSubmitRequest}
+        okText="Submit Request"
+        cancelText="Cancel"
+      >
+        <Input.TextArea
+          value={trainingGoal}
+          onChange={e => setTrainingGoal(e.target.value)}
+          placeholder="Describe your training goal..."
+          rows={4}
+        />
+      </Modal>
     </div>
   );
 }
