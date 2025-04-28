@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space } from "antd";
 import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useLoginModal } from "@/app/components/LoginModalContext";
+import { Avatar, Dropdown, MenuProps } from "antd";
+import { useRouter } from "next/navigation";
 
 interface Trainer {
   id: string;
@@ -57,8 +59,9 @@ export default function TrainerPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [user, setUser] = useState<null | { uid: string; email?: string; name?: string }>(null);
   const { showLogin } = useLoginModal();
+  const router = useRouter();
 
-  // 新增：控制弹窗
+  // 控制弹窗
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTrainer, setCurrentTrainer] = useState<Trainer | null>(null);
   const [trainingGoal, setTrainingGoal] = useState("");
@@ -146,6 +149,17 @@ export default function TrainerPage() {
     e.currentTarget.src = "/images/trainer.jpg";
   };
 
+  const handleLogout = async () => {
+    try {
+      const auth = getAuth();
+      await signOut(auth);
+      message.success("You have successfully logged out");
+      router.push("/home");
+    } catch (err) {
+      message.error("Logout failed. Please try again.");
+    }
+  };
+
   return (
     <div>
       {/* 顶部 Header */}
@@ -164,12 +178,45 @@ export default function TrainerPage() {
           </div>
         </div>
         <nav style={navStyle}>
-          <Link href="/login" className="nav-link" style={{ color: "#1890ff", fontWeight: 500 }}>
-            Login
-          </Link>
-          <Link href="/register" className="nav-link" style={{ color: "#1890ff", fontWeight: 500 }}>
-            Register
-          </Link>
+          {user ? (
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "1",
+                    label: <span>Logout</span>,
+                    onClick: handleLogout,
+                  }, 
+                  // { key: "2", label: <span>Profile</span> },
+                ],
+              }}
+              placement="bottomRight"
+            >
+              <Avatar
+                style={{
+                  backgroundColor: "#1890ff",
+                  verticalAlign: "middle",
+                  cursor: "pointer",
+                }}
+                size="large"
+              >
+                {(user.name || user.email || "U").charAt(0).toUpperCase()}
+              </Avatar>
+            </Dropdown>
+          ) : (
+            <Space>
+              <Link href="/login">
+                <Button type="primary" ghost>
+                  Login
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button type="primary">
+                  Register
+                </Button>
+              </Link>
+            </Space>
+          )}
         </nav>
       </header>
 
@@ -214,13 +261,13 @@ export default function TrainerPage() {
                 <Row>
                 <Col span={6} style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
                     <img
-                      src={trainer.image || "/images/trainer.jpg"} // 注意路径问题
+                      src={trainer.image || "/images/trainer.jpg"} 
                       style={{
-                        width: "180px",   // 固定宽度更好控制，比如180px
-                        height: "240px",  // 固定高度，保持比例
-                        objectFit: "cover",  // 裁剪图片让他填满，不变形
-                        borderRadius: "8px", // 圆角，让图片更好看
-                        boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)" // 加点阴影更有立体感
+                        width: "180px",   
+                        height: "240px",  
+                        objectFit: "cover",  
+                        borderRadius: "8px", 
+                        boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)"
                       }}
                       alt="Trainer"
                     />
