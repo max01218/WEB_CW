@@ -3,19 +3,22 @@
 import { Table, Button, message, Spin, Tag } from "antd";
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, query, where, Timestamp, updateDoc, addDoc, onSnapshot } from "firebase/firestore";
-import { ref, push } from 'firebase/database';
-import { db, database } from "@/lib/firebase";
+import { collection, getDocs, doc, query, where, Timestamp, updateDoc, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from 'next/navigation';
 
 interface Appointment {
   id: string;
-  email: string;
+  memberEmail: string;
   trainerId: string;
-  appointmentDate: string | Timestamp;
+  trainerName: string;
+  courseType: string;
+  date: Timestamp;
+  timeStart: string;
+  timeEnd: string;
   status: 'scheduled' | 'cancelled' | 'completed';
-  remarks?: string;
+  notes: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -36,18 +39,21 @@ export default function AppointmentsPage() {
 
       const appointmentsQuery = query(
         collection(db, "appointments"),
-        where("email", "==", memberData.email),
+        where("memberEmail", "==", memberData.email),
         where("status", "==", "scheduled")
       );
 
       const querySnapshot = await getDocs(appointmentsQuery);
-      const appointmentsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        appointmentDate: doc.data().appointmentDate,
-        createdAt: doc.data().createdAt,
-        updatedAt: doc.data().updatedAt
-      })) as Appointment[];
+      const appointmentsData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt
+        };
+      }) as Appointment[];
 
       // 只顯示 scheduled 狀態
       setAppointments(appointmentsData.filter(item => item.status === "scheduled"));
@@ -71,11 +77,17 @@ export default function AppointmentsPage() {
       fiveMinutesLater.setMinutes(fiveMinutesLater.getMinutes() + 5);
       
       const testAppointment = {
-        email: memberData.email,
-        trainerId: "trainer123",
-        appointmentDate: Timestamp.fromDate(fiveMinutesLater),
+        memberEmail: memberData.email,
+        memberName: memberData.name || 'Test Member',
+        trainerId: "T001",
+        trainerName: "Jiamu Li",
+        courseType: "General Fitness",
+        date: Timestamp.fromDate(fiveMinutesLater),
+        timeStart: "11:00",
+        timeEnd: "12:00",
+        duration: 60,
         status: "scheduled" as const,
-        remarks: "Test appointment (5 minutes later)",
+        notes: "Standard fitness routine including warm-up, cardio, and strength training",
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
@@ -86,11 +98,7 @@ export default function AppointmentsPage() {
       // 立即更新本地状态
       const newAppointment: Appointment = {
         id: appointmentRef.id,
-        email: memberData.email,
-        trainerId: "trainer123",
-        appointmentDate: Timestamp.fromDate(fiveMinutesLater),
-        status: "scheduled",
-        remarks: "Test appointment",
+        ...testAppointment
       };
       setAppointments(prevAppointments => [...prevAppointments, newAppointment]);
       
@@ -98,8 +106,8 @@ export default function AppointmentsPage() {
       const notification = {
         email: memberData.email,
         title: "New Appointment Reminder",
-        description: `You have successfully scheduled a training session for ${fiveMinutesLater.toLocaleString()}`,
-        date: new Date().toISOString(),
+        description: `You have successfully scheduled a ${testAppointment.courseType} training session with ${testAppointment.trainerName} for ${fiveMinutesLater.toLocaleDateString()} at ${testAppointment.timeStart}`,
+        date: Timestamp.now(),
         type: "appointment",
         read: false,
         appointmentId: appointmentRef.id,
@@ -122,18 +130,35 @@ export default function AppointmentsPage() {
 
   const onCancelAppointment = async (record: Appointment) => {
     try {
+      // 1. 更新appointment状态
       const appointmentRef = doc(db, "appointments", record.id);
       await updateDoc(appointmentRef, {
         status: "cancelled",
         updatedAt: Timestamp.now()
       });
       
-      // 立即更新本地状态
+      // 2. 查找并更新对应的training record
+      const trainingRecordQuery = query(
+        collection(db, "trainingRecords"),
+        where("email", "==", record.memberEmail),
+        where("sessionDate", "==", record.date)
+      );
+      
+      const querySnapshot = await getDocs(trainingRecordQuery);
+      if (!querySnapshot.empty) {
+        const trainingRecordDoc = querySnapshot.docs[0];
+        await updateDoc(doc(db, "trainingRecords", trainingRecordDoc.id), {
+          status: "cancelled",
+          updatedAt: Timestamp.now()
+        });
+      }
+      
+      // 3. 立即更新本地状态
       setAppointments(prevAppointments => 
         prevAppointments.filter(appointment => appointment.id !== record.id)
       );
       
-      // Create notification for the cancelled appointment
+      // 4. 创建取消通知
       if (!memberData) {
         throw new Error('Member data is required');
       }
@@ -141,17 +166,17 @@ export default function AppointmentsPage() {
       const notification = {
         email: memberData.email,
         title: "Appointment Cancellation Notice",
-        description: `You have cancelled the training session scheduled for ${record.appointmentDate instanceof Timestamp 
-          ? record.appointmentDate.toDate().toLocaleString()
-          : new Date(record.appointmentDate).toLocaleString()}`,
-        date: new Date().toISOString(),
+        description: `You have cancelled the training session scheduled for ${record.date instanceof Timestamp 
+          ? record.date.toDate().toLocaleString()
+          : new Date(record.date).toLocaleString()}`,
+        date: Timestamp.now(),
         type: "appointment",
         read: false,
         appointmentId: record.id,
         createdAt: Timestamp.now()
       };
 
-      // 使用 Firestore 存储通知
+      // 5. 存储通知
       await addDoc(collection(db, "notifications"), notification);
       
       message.success("Appointment cancelled.");
@@ -165,71 +190,96 @@ export default function AppointmentsPage() {
     }
   };
 
-  // 添加定时检查预约的函数
+  // 添加自动检查和更新预约状态的函数
   const checkAndUpdateAppointments = async () => {
-    console.log("checking appointments...");
-    try {
-      if (!user || !memberData) return;
+    if (!user || !memberData) return;
 
-      const now = Timestamp.now();
-      const appointmentsQuery = query(
+    try {
+      const now = new Date();
+      const appointmentQuery = query(
         collection(db, "appointments"),
-        where("email", "==", memberData.email),
+        where("memberEmail", "==", memberData.email),
         where("status", "==", "scheduled")
       );
 
-      const querySnapshot = await getDocs(appointmentsQuery);
+      const querySnapshot = await getDocs(appointmentQuery);
       
-      for (const doc of querySnapshot.docs) {
-        const appointment = doc.data();
-        
-        // 创建训练记录
-        const trainingRecord = {
-          email: appointment.email,
-          trainerId: appointment.trainerId,
-          sessionDate: appointment.appointmentDate,
-          status: 'completed',
-          duration: 60, // 默认训练时长为60分钟
-          createdAt: now,
-          updatedAt: now
-        };
+      for (const docSnapshot of querySnapshot.docs) {
+        const appointment = docSnapshot.data();
+        const appointmentDate = appointment.date;
+        const appointmentEndTime = appointment.timeEnd;
 
-        // 添加训练记录
-        await addDoc(collection(db, "trainingRecords"), trainingRecord);
+        if (appointmentDate instanceof Timestamp) {
+          const appointmentDateTime = appointmentDate.toDate();
+          const [hours, minutes] = appointmentEndTime.split(':').map(Number);
+          appointmentDateTime.setHours(hours, minutes, 0, 0);
 
-        // 更新预约状态为已完成
-        await updateDoc(doc.ref, {
-          status: "completed",
-          updatedAt: now
-        });
+          // 如果预约结束时间已过，且状态仍为 scheduled
+          if (appointmentDateTime < now) {
+            // 更新预约状态为已完成
+            await updateDoc(docSnapshot.ref, {
+              status: 'completed',
+              updatedAt: Timestamp.now()
+            });
 
-        // 创建通知
-        const notification = {
-          email: appointment.email,
-          title: "Training Session Completed",
-          description: `Your training session on ${appointment.appointmentDate.toDate().toLocaleString()} has been completed and recorded.`,
-          date: now,
-          type: "training",
-          read: false,
-          createdAt: now
-        };
+            // 创建训练记录
+            const trainingRecord = {
+              memberEmail: appointment.memberEmail,
+              memberName: appointment.memberName,
+              trainerId: appointment.trainerId,
+              trainerName: appointment.trainerName,
+              courseType: appointment.courseType,
+              sessionDate: appointment.date,
+              timeStart: appointment.timeStart,
+              timeEnd: appointment.timeEnd,
+              duration: appointment.duration,
+              status: 'completed',
+              notes: appointment.notes,
+              createdAt: Timestamp.now()
+            };
 
-        await addDoc(collection(db, "notifications"), notification);
+            // 添加训练记录
+            await addDoc(collection(db, "trainingRecords"), trainingRecord);
+
+            // 创建通知
+            const notification = {
+              email: appointment.memberEmail,
+              title: "Training Session Completed",
+              description: `Your ${appointment.courseType} training session with ${appointment.trainerName} has been completed.`,
+              date: Timestamp.now(),
+              type: "training",
+              read: false,
+              appointmentId: docSnapshot.id,
+              createdAt: Timestamp.now()
+            };
+
+            await addDoc(collection(db, "notifications"), notification);
+
+            // 更新本地状态
+            setAppointments(prevAppointments => 
+              prevAppointments.filter(apt => apt.id !== docSnapshot.id)
+            );
+          }
+        }
       }
     } catch (error) {
-      console.error("Error checking appointments:", error);
+      console.error("Error checking and updating appointments:", error);
     }
   };
 
-  // 添加定时器
+  // 添加定时检查
   useEffect(() => {
+    if (!user || !memberData) return;
+
     // 立即执行一次检查
     checkAndUpdateAppointments();
-    
-    // 每分钟检查一次
+
+    // 设置定时器，每分钟检查一次
     const interval = setInterval(checkAndUpdateAppointments, 60000);
-    
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [user, memberData]);
 
   useEffect(() => {
@@ -261,23 +311,35 @@ export default function AppointmentsPage() {
 
   const columns = [
     { 
+      title: "Course Type",
+      dataIndex: "courseType",
+      key: "courseType",
+      render: (courseType: string) => (
+        <Tag color="blue">{courseType}</Tag>
+      )
+    },
+    { 
       title: "Appointment Time",
-      dataIndex: "appointmentDate",
-      key: "appointmentDate",
-      render: (date: string | Timestamp) => {
-        const dateObj = date instanceof Timestamp ? date.toDate() : new Date(date);
+      key: "appointmentTime",
+      render: (_: any, record: Appointment) => {
+        const dateStr = record.date instanceof Timestamp 
+          ? record.date.toDate().toLocaleDateString('en-US')
+          : new Date(record.date).toLocaleDateString('en-US');
+        
         return (
           <div>
-            <div>{dateObj.toLocaleDateString('en-US')}</div>
+            <div>{record.timeStart} - {record.timeEnd}</div>
             <div style={{ color: '#666', fontSize: '12px' }}>
-              {dateObj.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-              })}
+              {dateStr}
             </div>
           </div>
         );
       }
+    },
+    { 
+      title: "Trainer",
+      dataIndex: "trainerName",
+      key: "trainerName",
     },
     { 
       title: "Status",
@@ -290,10 +352,19 @@ export default function AppointmentsPage() {
       )
     },
     { 
-      title: "Remarks",
-      dataIndex: "remarks",
-      key: "remarks",
-      ellipsis: true
+      title: "Exercise Details",
+      dataIndex: "notes",
+      key: "notes",
+      ellipsis: true,
+      render: (notes: string) => (
+        <div style={{ 
+          maxWidth: '300px',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word'
+        }}>
+          {notes || '-'}
+        </div>
+      )
     },
     {
       title: "Action",
@@ -386,12 +457,6 @@ export default function AppointmentsPage() {
             </Button>
             <h1 style={{ margin: 0 }}>Appointment Management</h1>
           </div>
-          <Button 
-            type="primary"
-            onClick={addTestAppointment}
-          >
-            Add Test Appointment
-          </Button>
         </div>
         <Table 
           columns={columns} 

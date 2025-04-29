@@ -14,13 +14,11 @@ import {
   LogoutOutlined,
   TrophyOutlined,
   CheckOutlined,
-  PlusOutlined,
   EditOutlined,
   EnvironmentOutlined
 } from "@ant-design/icons";
 import { collection, query, where, getDocs, Timestamp, onSnapshot, orderBy, addDoc } from 'firebase/firestore';
-import { ref, onValue, update } from 'firebase/database';
-import { db, database } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -91,18 +89,25 @@ const DashboardPage = () => {
     const now = new Date();
     const appointmentQuery = query(
       collection(db, 'appointments'),
-      where('email', '==', memberData.email),
+      where('memberEmail', '==', memberData.email),
       where('status', '==', 'scheduled')
     );
 
     // 设置实时监听
     const unsubscribeAppointments = onSnapshot(appointmentQuery, (snapshot) => {
       const upcomingAppointments = snapshot.docs.filter(doc => {
-        const appointmentDate = doc.data().appointmentDate;
+        const data = doc.data();
+        const appointmentDate = data.date;
+        const appointmentEndTime = data.timeEnd;
+        
         if (appointmentDate instanceof Timestamp) {
-          return appointmentDate.toDate() > now;
+          const appointmentDateTime = appointmentDate.toDate();
+          // 设置预约结束时间
+          const [hours, minutes] = appointmentEndTime.split(':').map(Number);
+          appointmentDateTime.setHours(hours, minutes, 0, 0);
+          return appointmentDateTime > now;
         }
-        return new Date(appointmentDate) > now;
+        return false;
       }).length;
 
       setStats(prev => ({
@@ -342,48 +347,6 @@ const DashboardPage = () => {
       )}
     </div>
   );
-
-  const createTestAppointment = async () => {
-    if (!memberData?.email) return;
-
-    try {
-      // 计算两周后的日期
-      const twoWeeksLater = new Date();
-      twoWeeksLater.setDate(twoWeeksLater.getDate() + 14);
-      twoWeeksLater.setHours(10, 0, 0, 0); // 设置为上午10点
-
-      const testAppointment = {
-        email: memberData.email,
-        appointmentDate: Timestamp.fromDate(twoWeeksLater),
-        status: 'scheduled',
-        type: 'training',
-        notes: 'Test appointment created from dashboard',
-        createdAt: Timestamp.now()
-      };
-
-      // 添加预约
-      const appointmentRef = await addDoc(collection(db, 'appointments'), testAppointment);
-
-      // 创建通知
-      const notification = {
-        email: memberData.email,
-        title: 'New Appointment Scheduled',
-        description: `Test appointment scheduled for ${twoWeeksLater.toLocaleDateString()} at 10:00 AM`,
-        date: Timestamp.now(),
-        type: 'appointment',
-        read: false,
-        appointmentId: appointmentRef.id,
-        createdAt: Timestamp.now()
-      };
-
-      await addDoc(collection(db, 'notifications'), notification);
-
-      message.success('Test appointment created successfully!');
-    } catch (error) {
-      console.error('Error creating test appointment:', error);
-      message.error('Failed to create test appointment');
-    }
-  };
 
   const handleEditProfile = () => {
     router.push('/member/profile');
@@ -628,27 +591,6 @@ const DashboardPage = () => {
                 </div>
               </Card>
             </Link>
-          </Col>
-        </Row>
-
-        {/* Test Appointment Button */}
-        <Row style={{ marginTop: "24px" }}>
-          <Col span={24} style={{ textAlign: 'center' }}>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={createTestAppointment}
-              style={{
-                height: '40px',
-                padding: '0 24px',
-                borderRadius: '20px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                background: 'linear-gradient(45deg, #1890ff, #096dd9)',
-                border: 'none'
-              }}
-            >
-              Create Test Appointment
-            </Button>
           </Col>
         </Row>
       </div>
