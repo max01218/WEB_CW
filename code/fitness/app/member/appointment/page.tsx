@@ -111,6 +111,7 @@ export default function AppointmentsPage() {
         type: "appointment",
         read: false,
         appointmentId: appointmentRef.id,
+        trainerId: testAppointment.trainerId,
         createdAt: Timestamp.now()
       };
 
@@ -173,6 +174,7 @@ export default function AppointmentsPage() {
         type: "appointment",
         read: false,
         appointmentId: record.id,
+        trainerId: record.trainerId,
         createdAt: Timestamp.now()
       };
 
@@ -250,6 +252,7 @@ export default function AppointmentsPage() {
               type: "training",
               read: false,
               appointmentId: docSnapshot.id,
+              trainerId: appointment.trainerId,
               createdAt: Timestamp.now()
             };
 
