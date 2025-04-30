@@ -148,7 +148,8 @@ export default function TrainerPage() {
       // 提交新请求
       await addDoc(collection(db, "requests"), {
         memberId: user.uid,
-        memberName: user.name || user.email || "Anonymous",
+        memberName: user.email,
+        requesterUid: user.uid,
         trainerId: currentTrainer.trainerId,
         trainerName: currentTrainer.name,
         trainingGoal: trainingGoal.trim(),
@@ -432,10 +433,10 @@ export default function TrainerPage() {
                   </Col>
                   <Col span={18} style={{ padding: 16 }}>
                     <h3>{trainer.name}</h3>
-                    <p><strong>Trainer ID:</strong> {trainer.trainerId}</p>
-                    {trainer.intro && <p><strong>Introduction:</strong> {trainer.intro}</p>}
-                    {trainer.email && <p><strong>Email:</strong> {trainer.email}</p>}
-                    {trainer.telephone && <p><strong>Telephone:</strong> {trainer.telephone}</p>}
+                    <p><strong>Trainer ID:</strong> {trainer.trainerId}</p >
+                    {trainer.intro && <p><strong>Introduction:</strong> {trainer.intro}</p >}
+                    {trainer.email && <p><strong>Email:</strong> {trainer.email}</p >}
+                    {trainer.telephone && <p><strong>Telephone:</strong> {trainer.telephone}</p >}
                     <Button
                       type="primary"
                       onClick={() => openRequestModal(trainer)}
