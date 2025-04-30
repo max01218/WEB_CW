@@ -4,12 +4,13 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space } from "antd";
 import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useLoginModal } from "@/app/components/LoginModalContext";
 import { Avatar, Dropdown, MenuProps } from "antd";
 import { useRouter } from "next/navigation";
+
 
 interface Trainer {
   id: string;
@@ -91,6 +92,10 @@ export default function TrainerPage() {
     fetchTrainers();
   }, []);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  if (isSubmitting) return;
+
+
   const handleAdvancedSearch = () => {
     const namePrefix = searchNamePrefix.trim().toLowerCase();
     const trainerIdKeyword = searchTrainerId.trim().toLowerCase();
@@ -113,32 +118,58 @@ export default function TrainerPage() {
     setCurrentTrainer(trainer);
     setIsModalOpen(true);
   };
-
+  
   const handleSubmitRequest = async () => {
     if (!trainingGoal.trim()) {
       message.warning("Please enter your training goal.");
       return;
     }
+  
     if (!user || !currentTrainer) {
       message.error("Error: Missing user or trainer information.");
       return;
     }
+    console.log(user)
     try {
+      // 防止重复提交（可选）
+      setIsSubmitting(true);
+  
+      // 查询当前用户是否已有“未完成”的请求
+      const q = query(
+        collection(db, "requests"),
+        where("memberId", "==", user.uid),
+        where("status", "in", ["pending", "accepted"])
+      );
+      console.log('q='+q)
+      const snap = await getDocs(q);
+      console.log("snap"+snap)
+  
+      if (!snap.empty) {
+        message.warning("You already have a pending request. Please wait for the coach's reply.");
+        return;
+      }
+  
+      // 提交新请求
       await addDoc(collection(db, "requests"), {
         memberId: user.uid,
         memberName: user.name || user.email || "Anonymous",
         trainerId: currentTrainer.trainerId,
         trainerName: currentTrainer.name,
-        trainingGoal,
+        trainingGoal: trainingGoal.trim(),
         requestedAt: serverTimestamp(),
+        status: "pending",
       });
+  
       message.success("Training request sent successfully!");
       setIsModalOpen(false);
       setTrainingGoal("");
     } catch (error) {
+      console.error("Error submitting request:", error);
       message.error("Failed to send request.");
+    } finally {
+      setIsSubmitting(false); 
     }
-  };
+  };  
 
   const currentPageData = filteredTrainers.slice(
     (currentPage - 1) * PAGE_SIZE,
@@ -160,6 +191,45 @@ export default function TrainerPage() {
     }
   };
 
+  const handleCheckStatus = async () => {
+    if (!user) {
+      message.warning("Please login first.");
+      router.push("/login");
+      return;
+    }
+  
+    try {
+      const q = query(
+        collection(db, "requests"),
+        where("memberId", "==", user.uid)
+      );
+      const snap = await getDocs(q);
+  
+      if (snap.empty) {
+        message.info("You have not submitted any request yet.");
+        return;
+      }
+  
+      const requestData = snap.docs[0].data();
+      const status = requestData.status;
+  
+      if (status === "accepted") {
+        router.push("/member/dashboard");
+      } else if (status === "pending") {
+        message.info("The request is still under review.");
+      } else if (status === "rejected") {
+        message.error("You have been rejected. Please choose again.");
+      } else {
+        message.warning("Unknown request status.");
+      }
+    } catch (err) {
+      console.error("Error checking request status:", err);
+      message.error("Failed to check request status.");
+    }
+  };
+  
+  
+  
   return (
     <div>
       {/* 顶部 Header */}
@@ -169,9 +239,13 @@ export default function TrainerPage() {
             <AppstoreOutlined /> Fitness Tracker
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
-            <Link href="/course" className="nav-link" style={{ color: "#555", fontWeight: 500 }}>
-              <UserOutlined /> Classes
-            </Link>
+          <a
+            onClick={handleCheckStatus}
+            className="nav-link"
+            style={{ color: "#555", fontWeight: 500, cursor: "pointer" }}
+          >
+            <UserOutlined /> Classes
+          </a>
             <Link href="/trainer_search" className="nav-link" style={{ color: "#555", fontWeight: 500 }}>
               🏋️ Trainer
             </Link>
