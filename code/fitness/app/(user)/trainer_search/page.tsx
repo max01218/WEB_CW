@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space } from "antd";
-import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
-import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space, Popover, Badge, List } from "antd";
+import { AppstoreOutlined, UserOutlined, BellOutlined, CheckOutlined } from "@ant-design/icons";
+import { collection, getDocs, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useLoginModal } from "@/app/components/LoginModalContext";
-import { Avatar, Dropdown, MenuProps } from "antd";
+import { Avatar, Dropdown, Typography } from "antd";
 import { useRouter } from "next/navigation";
-
 
 interface Trainer {
   id: string;
@@ -66,6 +65,10 @@ export default function TrainerPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTrainer, setCurrentTrainer] = useState<Trainer | null>(null);
   const [trainingGoal, setTrainingGoal] = useState("");
+  const [notifications, setNotifications] = useState<
+  Array<{ id: string; description: string; read: boolean; type: string }>>([]);
+
+
 
   useEffect(() => {
     const auth = getAuth();
@@ -91,10 +94,6 @@ export default function TrainerPage() {
     };
     fetchTrainers();
   }, []);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  if (isSubmitting) return;
-
 
   const handleAdvancedSearch = () => {
     const namePrefix = searchNamePrefix.trim().toLowerCase();
@@ -131,9 +130,6 @@ export default function TrainerPage() {
     }
     console.log(user)
     try {
-      // 防止重复提交（可选）
-      setIsSubmitting(true);
-  
       // 查询当前用户是否已有“未完成”的请求
       const q = query(
         collection(db, "requests"),
@@ -166,9 +162,7 @@ export default function TrainerPage() {
     } catch (error) {
       console.error("Error submitting request:", error);
       message.error("Failed to send request.");
-    } finally {
-      setIsSubmitting(false); 
-    }
+    } 
   };  
 
   const currentPageData = filteredTrainers.slice(
@@ -201,7 +195,8 @@ export default function TrainerPage() {
     try {
       const q = query(
         collection(db, "requests"),
-        where("memberId", "==", user.uid)
+        where("memberId", "==", user.uid),
+        orderBy("requestedAt", "desc") // 按时间降序
       );
       const snap = await getDocs(q);
   
@@ -210,13 +205,13 @@ export default function TrainerPage() {
         return;
       }
   
-      const requestData = snap.docs[0].data();
-      const status = requestData.status;
+      const latestRequest = snap.docs[0].data(); // 最新一条
+      const status = latestRequest.status;
   
       if (status === "accepted") {
         router.push("/member/dashboard");
       } else if (status === "pending") {
-        message.info("The request is still under review.");
+        message.info("You already have a pending request. Please wait for the coach's reply.");
       } else if (status === "rejected") {
         message.error("You have been rejected. Please choose again.");
       } else {
@@ -230,6 +225,55 @@ export default function TrainerPage() {
   
   
   
+  useEffect(() => {
+    if (!user?.email) return;
+    const q = query(
+      collection(db, 'notifications'),
+      where('email', '==', user.email),
+      where('type', '==', 'rejected')
+    );
+    console.log((q as any)._query?.filters);
+   // onSnapshot 会实时推送增删改
+   const unsubscribe = onSnapshot(q, (snap) => {
+    const arr: any[] = [];
+    snap.docs.forEach((d) => arr.push({ id: d.id, ...(d.data() as any) }));
+    setNotifications(arr);
+
+    // 可选：新通知到来时弹出提示
+    const newUnread = arr.filter((n) => !n.read);
+    if (newUnread.length > 0) {
+      message.info(`You have ${newUnread.length} new notification(s)`);
+    }
+  });
+
+    return () => unsubscribe();
+  }, [user?.email]);
+  
+  // 测试用例
+  // useEffect(() => {
+  //   if (!user?.email) return;
+  //   const unsub = onSnapshot(collection(db,'notifications'), snap => {
+  //     console.log('all notifications:', snap.docs.map(d=>d.data()));
+  //   }, err=>console.error(err));
+  //   return unsub;
+  // }, [user]);
+  
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const markAsRead = async (notifId: string) => {
+    await updateDoc(doc(db, 'notifications', notifId), { read: true });
+  };
+  const popoverContent = (
+    <List
+      size="small"
+      dataSource={notifications}
+      locale={{ emptyText: 'No notifications' }}
+      renderItem={item => (
+        <List.Item onClick={() => markAsRead(item.id)} style={{ cursor: 'pointer' }}>
+          <Typography.Text strong={!item.read}>{item.description}</Typography.Text>
+        </List.Item>
+      )}
+    />
+  );
   return (
     <div>
       {/* 顶部 Header */}
@@ -252,6 +296,46 @@ export default function TrainerPage() {
           </div>
         </div>
         <nav style={navStyle}>
+            <Popover
+              content={popoverContent}
+              title={
+                <div style={{
+                  padding: '8px 4px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  borderBottom: '1px solid #f0f0f0'
+                }}>
+                  Notifications
+                </div>
+              }
+              trigger="click"
+              placement="bottomRight"
+              overlayStyle={{ 
+                width: 350,
+                padding: 0
+              }}
+              overlayInnerStyle={{
+                borderRadius: '12px',
+                boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+              }}
+            >
+              <Badge 
+                count={unreadCount} 
+                offset={[-2, 2]}
+                style={{
+                  backgroundColor: '#ff4d4f'
+                }}
+              >
+                <Button
+                  type="text"
+                  icon={<BellOutlined style={{ 
+                    fontSize: '22px',
+                    color: 'rgba(0, 0, 0, 0.65)'
+                  }} />}
+                />
+              </Badge>
+            </Popover>
+
           {user ? (
             <Dropdown
               menu={{
