@@ -1,7 +1,7 @@
 // app/member/view/dashboard/page.js
 "use client";
 
-import { Card, Row, Col, Statistic, Button, Typography, Badge, Popover, List, Spin, message } from "antd";
+import { Card, Row, Col, Statistic, Button, Typography, Badge, Popover, List, Spin, message, Progress, Tag } from "antd";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import './styles.css';
@@ -56,6 +56,23 @@ interface DashboardStats {
   unreadNotifications: number;
 }
 
+interface TrainingRecord {
+  id: string;
+  duration: number;
+  email: string;
+  sessionDate: Timestamp;
+  status: 'completed' | 'cancelled' | 'pending';
+  session?: string;
+  courseType?: string;
+}
+
+interface CourseProgress {
+  courseType: string;
+  completedSessions: number;
+  totalSessionsRequired: number;
+  progressPercentage: number;
+}
+
 interface Notification {
   id: string;
   title: string;
@@ -77,10 +94,58 @@ const DashboardPage = () => {
     completedTrainings: 0,
     unreadNotifications: 0
   });
+  const [courseProgress, setCourseProgress] = useState<Record<string, CourseProgress>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, memberData, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  const calculateCourseProgress = (records: TrainingRecord[]) => {
+    try {
+      // Filter out records with missing session type
+      const validRecords = records.filter(record => record.session);
+      console.log(`Calculating progress for ${validRecords.length} valid records`);
+      
+      const courseGroups = validRecords.reduce<Record<string, TrainingRecord[]>>((acc, record) => {
+        try {
+          const session = record.session;
+          if (!session) return acc;
+          
+          if (!acc[session]) {
+            acc[session] = [];
+          }
+            
+          if (record.status === 'completed') {
+            acc[session].push(record);
+          }
+          return acc;
+        } catch (error) {
+          console.error("Error processing record for course progress:", error, record);
+          return acc;
+        }
+      }, {});
+      
+      const progress: Record<string, CourseProgress> = {};
+      for (const [session, courseRecords] of Object.entries(courseGroups)) {
+        const totalSessionsRequired = 10;
+        const completedSessions = courseRecords.length;
+        const progressPercentage = Math.min(Math.round((completedSessions / totalSessionsRequired) * 100), 100);
+        
+        progress[session] = {
+          courseType: session,
+          completedSessions,
+          totalSessionsRequired,
+          progressPercentage
+        };
+      }
+      
+      console.log("Course progress calculated:", progress);
+      setCourseProgress(progress);
+    } catch (error) {
+      console.error("Error calculating course progress:", error);
+      setCourseProgress({});
+    }
+  };
 
   // 监听预约变化
   useEffect(() => {
@@ -138,6 +203,13 @@ const DashboardPage = () => {
         (total, doc) => total + (doc.data().duration || 0), 
         0
       );
+
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TrainingRecord[];
+
+      calculateCourseProgress(records);
 
       setStats(prev => ({
         ...prev,
@@ -514,6 +586,73 @@ const DashboardPage = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* Course Progress Section */}
+        {Object.keys(courseProgress).length > 0 && (
+          <Row gutter={[24, 24]} style={{ marginBottom: "32px" }}>
+            <Col span={24}>
+              <Card 
+                title={
+                  <div style={{ 
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#1890ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <TrophyOutlined />
+                    Course Progress
+                  </div>
+                }
+              >
+                <Row gutter={[24, 24]}>
+                  {Object.values(courseProgress).map((progress) => (
+                    <Col xs={24} sm={12} key={progress.courseType}>
+                      <Card 
+                        hoverable 
+                        bodyStyle={{ 
+                          padding: '20px',
+                          background: progress.progressPercentage === 100 ? 'rgba(82,196,26,0.1)' : 'transparent'
+                        }}
+                      >
+                        <div style={{ marginBottom: '12px' }}>
+                          <Text strong style={{ fontSize: '16px' }}>
+                            {progress.courseType}
+                          </Text>
+                        </div>
+                        <Progress
+                          percent={progress.progressPercentage}
+                          status={progress.progressPercentage === 100 ? 'success' : 'active'}
+                          strokeColor={{
+                            '0%': '#108ee9',
+                            '100%': progress.progressPercentage === 100 ? '#52c41a' : '#1890ff',
+                          }}
+                          strokeWidth={10}
+                        />
+                        <div style={{ 
+                          marginTop: '12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <Text type="secondary">
+                            Completed: {progress.completedSessions} / {progress.totalSessionsRequired}
+                          </Text>
+                          {progress.progressPercentage === 100 && (
+                            <Tag color="success" icon={<CheckOutlined />}>
+                              Completed
+                            </Tag>
+                          )}
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </Card>
+            </Col>
+          </Row>
+        )}
 
         {/* Navigation cards */}
         <Row gutter={[24, 24]}>
