@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Input, Button, Card, Row, Col, Spin, message, Pagination, Empty, Modal, Space } from "antd";
 import { AppstoreOutlined, UserOutlined } from "@ant-design/icons";
-import { collection, getDocs, addDoc, serverTimestamp, query, where, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useLoginModal } from "@/app/components/LoginModalContext";
@@ -129,22 +129,20 @@ export default function TrainerPage() {
       message.error("Error: Missing user or trainer information.");
       return;
     }
-  
+    console.log(user)
     try {
+      // 防止重复提交（可选）
       setIsSubmitting(true);
-
-      console.log('User info:', { uid: user.uid, email: user.email });
-      console.log('Trainer info:', currentTrainer);
   
-      // 查询当前用户是否已有"未完成"的请求
+      // 查询当前用户是否已有“未完成”的请求
       const q = query(
         collection(db, "requests"),
         where("memberId", "==", user.uid),
         where("status", "in", ["pending", "accepted"])
       );
-  
+      console.log('q='+q)
       const snap = await getDocs(q);
-      console.log('Existing requests:', snap.docs.map(d => d.data()));
+      console.log("snap"+snap)
   
       if (!snap.empty) {
         message.warning("You already have a pending request. Please wait for the coach's reply.");
@@ -152,7 +150,7 @@ export default function TrainerPage() {
       }
   
       // 提交新请求
-      const requestData = {
+      await addDoc(collection(db, "requests"), {
         memberId: user.uid,
         memberName: user.email,
         requesterUid: user.uid,
@@ -160,20 +158,15 @@ export default function TrainerPage() {
         trainerName: currentTrainer.name,
         trainingGoal: trainingGoal.trim(),
         requestedAt: serverTimestamp(),
-        status: "pending"
-      };
-
-      console.log('Submitting request:', requestData);
-      
-      const requestRef = await addDoc(collection(db, "requests"), requestData);
-      console.log('Request created with ID:', requestRef.id);
+        status: "pending",
+      });
   
       message.success("Training request sent successfully!");
       setIsModalOpen(false);
       setTrainingGoal("");
     } catch (error) {
       console.error("Error submitting request:", error);
-      message.error("Failed to send request: " + (error instanceof Error ? error.message : "Unknown error"));
+      message.error("Failed to send request.");
     } finally {
       setIsSubmitting(false); 
     }
@@ -253,7 +246,7 @@ export default function TrainerPage() {
             style={{ color: "#555", fontWeight: 500, cursor: "pointer" }}
           >
             <UserOutlined /> Classes
-          </a >
+          </a>
             <Link href="/trainer_search" className="nav-link" style={{ color: "#555", fontWeight: 500 }}>
               🏋️ Trainer
             </Link>
