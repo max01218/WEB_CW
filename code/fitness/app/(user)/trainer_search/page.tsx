@@ -250,15 +250,6 @@ export default function TrainerPage() {
     return () => unsubscribe();
   }, [user?.email]);
   
-  // 测试用例
-  // useEffect(() => {
-  //   if (!user?.email) return;
-  //   const unsub = onSnapshot(collection(db,'notifications'), snap => {
-  //     console.log('all notifications:', snap.docs.map(d=>d.data()));
-  //   }, err=>console.error(err));
-  //   return unsub;
-  // }, [user]);
-  
   const unreadCount = notifications.filter(n => !n.read).length;
   const markAsRead = async (notifId: string) => {
     await updateDoc(doc(db, 'notifications', notifId), { read: true });
