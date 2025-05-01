@@ -40,25 +40,40 @@ const ReceiveMemberPage = () => {
   const { memberData } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    console.log("Full memberData object:", memberData);
+  }, [memberData]);
+
   const getTrainerId = async () => {
-    const userEmail = memberData?.email;
-    if (!userEmail) {
-      console.error("User email not available");
-      message.error("Authentication error: No email available");
+    console.log("Starting getTrainerId with memberData:", memberData);
+    
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
       return null;
     }
     
-    // 首先检查memberData中是否已有trainerId
-    if (memberData?.trainerId) {
-      console.log("Using trainerId from memberData:", memberData.trainerId);
+    // Check all possible ID fields
+    if (memberData.id) {
+      console.log("Using ID from memberData.id:", memberData.id);
+      return memberData.id;
+    }
+    
+    if (memberData.trainerId) {
+      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
       return memberData.trainerId;
+    }
+    
+    if (memberData.memberId) {
+      console.log("Using ID from memberData.memberId:", memberData.memberId);
+      return memberData.memberId;
     }
     
     try {
       // 根据邮箱在trainer集合中查找对应的教练
       const trainersQuery = query(
         collection(db, 'trainer'),
-        where('email', '==', userEmail)
+        where('email', '==', memberData.email)
       );
       
       const trainerSnapshot = await getDocs(trainersQuery);
@@ -66,7 +81,7 @@ const ReceiveMemberPage = () => {
         const trainerData = trainerSnapshot.docs[0].data();
         return trainerData.trainerId || trainerSnapshot.docs[0].id;
       } else {
-        console.error("No trainer found with email:", userEmail);
+        console.error("No trainer found with email:", memberData.email);
         // 如果找不到对应的trainer记录，使用memberId作为fallback
         return memberData?.memberId || null;
       }
