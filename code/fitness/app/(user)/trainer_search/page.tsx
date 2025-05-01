@@ -463,7 +463,7 @@ export default function TrainerPage() {
 
       {/* 输入训练目标的 Modal */}
       <Modal
-        title="Submit your training goal"
+        title="Submit your training goal and expected time"
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         onOk={handleSubmitRequest}
@@ -473,7 +473,7 @@ export default function TrainerPage() {
         <Input.TextArea
           value={trainingGoal}
           onChange={e => setTrainingGoal(e.target.value)}
-          placeholder="Describe your training goal..."
+          placeholder="Describe your training goal and expected time..."
           rows={4}
         />
       </Modal>
