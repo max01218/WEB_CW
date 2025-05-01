@@ -470,6 +470,7 @@ export default function TrainerPage() {
         okText="Submit Request"
         cancelText="Cancel"
       >
+        e.g. Sunday 9am-11am
         <Input.TextArea
           value={trainingGoal}
           onChange={e => setTrainingGoal(e.target.value)}
