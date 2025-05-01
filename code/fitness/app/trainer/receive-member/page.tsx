@@ -54,10 +54,7 @@ const ReceiveMemberPage = () => {
     }
     
     // Check all possible ID fields
-    if (memberData.id) {
-      console.log("Using ID from memberData.id:", memberData.id);
-      return memberData.id;
-    }
+
     
     if (memberData.trainerId) {
       console.log("Using ID from memberData.trainerId:", memberData.trainerId);
@@ -508,7 +505,7 @@ const ReceiveMemberPage = () => {
             icon={<CloseCircleOutlined />}
             onClick={() => showRejectionModal(record)}
           >
-            Reject and Recommend
+            Reject with Recommendation
           </Button>
         </div>
       ),
