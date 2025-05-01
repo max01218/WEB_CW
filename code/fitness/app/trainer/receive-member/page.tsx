@@ -411,21 +411,9 @@ const ReceiveMemberPage = () => {
         
         console.log("Original request updated as rejected");
         
-        // 2. 为替代教练创建新请求
-        console.log("Creating new request for alternative trainer");
-        const newRequestRef = await addDoc(collection(db, 'requests'), {
-          memberId: currentRequest.memberId,
-          memberName: currentRequest.memberName,
-          trainerId: selectedTrainer,
-          trainerName: selectedTrainerData.name || 'Alternative Trainer',
-          trainingGoal: currentRequest.trainingGoal || 'General Training',
-          requestedAt: Timestamp.now(),
-          status: 'pending',
-          recommendedBy: currentRequest.trainerName || 'Original Trainer'
-        });
+
         
-        console.log("New request created for alternative trainer:", newRequestRef.id);
-        
+       
         // 3. 为会员创建通知
         console.log("Creating notification for member");
         const notificationData = {
