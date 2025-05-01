@@ -2,26 +2,64 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 辅助函数
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isTrainer() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'trainer';
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
     // 會員資料規則
     match /members/{userId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == userId || // 允許用戶讀取自己的資料
-        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'admin' // 或管理員可讀取
-      );
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isTrainer());
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin() || isTrainer());
     }
 
+    // 請求資料規則 - 简化规则
+    match /requests/{requestId} {
+      // 所有已登录用户可以读取请求，特别是教练可以读取分配给他们的请求
+      allow read: if isSignedIn();
+      // 所有已登录用户可以创建请求
+      allow create: if isSignedIn();
+      // 管理员可以更新任何请求，教练可以更新分配给他们的请求
+      allow update, delete: if isAdmin() || 
+        (isTrainer() && resource.data.trainerId == get(/databases/$(database)/documents/members/$(request.auth.uid)).data.trainerId);
+    }
+    
     // 預約資料規則
     match /appointments/{appointmentId} {
-      allow read: if request.auth != null && (
-        resource.data.email == request.auth.token.email || // 用戶可以讀取自己的預約
-        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['admin', 'trainer'] // 管理員和教練可讀取
+      allow read: if isSignedIn() && (
+        resource.data.memberEmail == request.auth.token.email || 
+        isAdmin() || isTrainer()
       );
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
-        resource.data.email == request.auth.token.email || // 用戶可以更新自己的預約
-        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['admin', 'trainer'] // 管理員和教練可更新
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.memberEmail == request.auth.token.email || 
+        isAdmin() || isTrainer()
+      );
+    }
+    
+    // 通知資料規則
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.email == request.auth.token.email || isAdmin()
+      );
+      allow create: if isSignedIn() && (isAdmin() || isTrainer());
+      allow update: if isSignedIn() && (
+        resource.data.email == request.auth.token.email || isAdmin()
       );
     }
   }

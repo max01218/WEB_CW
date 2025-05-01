@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface WithAuthProps {
   requiredRole?: string;
@@ -40,6 +41,28 @@ export function withAuth<P extends object>(
 
           // 如果需要特定角色
           if (requiredRole && userData.role !== requiredRole) {
+            console.log(`需要角色 ${requiredRole}，但用户角色是 ${userData.role}`);
+            
+            // 如果用户是trainer但没有trainerId，可能需要额外检查trainer集合
+            if (requiredRole === 'trainer' && userData.role !== 'trainer') {
+              const trainerDoc = await getDoc(doc(db, 'trainer', user.uid));
+              if (trainerDoc.exists()) {
+                setIsAuthorized(true);
+                return;
+              }
+              
+              // 尝试查询trainer集合以查找匹配的email
+              const trainersQuery = query(
+                collection(db, 'trainer'),
+                where('email', '==', user.email)
+              );
+              const trainerSnapshot = await getDocs(trainersQuery);
+              if (!trainerSnapshot.empty) {
+                setIsAuthorized(true);
+                return;
+              }
+            }
+            
             message.error('NO permission');
             router.push('/home');
             return;
@@ -47,6 +70,7 @@ export function withAuth<P extends object>(
 
           setIsAuthorized(true);
         } catch (error) {
+          console.error('权限检查错误:', error);
           message.error('error');
           router.push('/home');
         } finally {

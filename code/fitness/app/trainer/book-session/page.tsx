@@ -66,24 +66,20 @@ const BookSessionPage = () => {
     try {
       let trainerIdQuery: string;
 
-      // 优先使用memberData中的trainerId, 如果没有则尝试从trainer集合中查询
-      if (memberData.trainerId) {
-        trainerIdQuery = memberData.trainerId;
+      // 直接从trainer集合中查询trainerId
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
       } else {
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // 如果仍然没有找到，则使用memberId作为fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId || 'T001';
-        }
+        // 如果没有找到，则使用memberId作为fallback
+        console.warn("No trainer found, using memberId as fallback");
+        trainerIdQuery = memberData.memberId || 'T001';
       }
       
       console.log("Current trainer ID:", trainerIdQuery);
@@ -248,25 +244,20 @@ const BookSessionPage = () => {
     try {
       let trainerIdQuery: string;
       
-      // Try to get trainerId from memberData, if not available, try to find it from trainers collection
-      if (memberData.trainerId) {
-        trainerIdQuery = memberData.trainerId;
+      // 直接从trainer集合中获取trainerId
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
       } else {
-        // Try to find from trainers collection
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // If still not found, use memberId as fallback
-          console.warn("No trainer found for appointments, using memberId as fallback");
-          trainerIdQuery = memberData.memberId || 'T001';
-        }
+        // 如果没有找到，使用memberId作为fallback
+        console.warn("No trainer found for appointments, using memberId as fallback");
+        trainerIdQuery = memberData.memberId || 'T001';
       }
       
       const appointmentsQuery = query(
@@ -363,28 +354,26 @@ const BookSessionPage = () => {
         return;
       }
       
-      // Get trainerId - use the same approach as in fetchAppointments
-      let trainerId = memberData?.trainerId;
-      if (!trainerId) {
-        try {
-          // Try to get from trainer collection
-          const trainersQuery = query(
-            collection(db, 'trainer'),
-            where('email', '==', memberData?.email || '')
-          );
-          
-          const trainerSnapshot = await getDocs(trainersQuery);
-          if (!trainerSnapshot.empty) {
-            const trainerData = trainerSnapshot.docs[0].data();
-            trainerId = trainerData.trainerId || trainerSnapshot.docs[0].id;
-          } else {
-            // Fallback to memberId
-            trainerId = memberData?.memberId || 'T001';
-          }
-        } catch (err) {
-          console.error('Error finding trainerId:', err);
-          trainerId = 'T001'; // Default fallback
+      // 直接从trainer集合获取trainerId
+      let trainerId: string;
+      try {
+        // 从trainer集合中查询
+        const trainersQuery = query(
+          collection(db, 'trainer'),
+          where('email', '==', memberData?.email || '')
+        );
+        
+        const trainerSnapshot = await getDocs(trainersQuery);
+        if (!trainerSnapshot.empty) {
+          const trainerData = trainerSnapshot.docs[0].data();
+          trainerId = trainerData.trainerId || trainerSnapshot.docs[0].id;
+        } else {
+          // 使用memberId作为fallback
+          trainerId = memberData?.memberId || 'T001';
         }
+      } catch (err) {
+        console.error('Error finding trainerId:', err);
+        trainerId = 'T001'; // 默认值
       }
       
       // 确保所有字段都有值，避免undefined

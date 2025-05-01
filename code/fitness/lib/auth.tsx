@@ -20,6 +20,7 @@ interface MemberData {
   status: 'active' | 'inactive';
   birthday?: Date | null;
   address?: string;
+  trainerId?: string;
   createdAt: any;
   updatedAt: any;
 }
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status: 'active',
         birthday: null,
         address: '',
+        trainerId: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -147,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status: 'active',
         birthday: null,
         address: '',
+        trainerId: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

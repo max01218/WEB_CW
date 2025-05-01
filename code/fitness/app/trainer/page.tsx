@@ -24,24 +24,22 @@ const TrainerDashboard = () => {
       
       setLoading(true);
       try {
-        // Get trainer ID (either from memberData or by querying the trainer collection)
-        let trainerIdQuery = memberData.trainerId;
+        // 直接从trainer集合中获取trainerId
+        let trainerIdQuery: string;
         
-        // If trainerId is not in memberData, try to find it in the trainer collection
-        if (!trainerIdQuery) {
-          const trainersQuery = query(
-            collection(db, 'trainer'),
-            where('email', '==', memberData.email)
-          );
-          
-          const trainerSnapshot = await getDocs(trainersQuery);
-          if (!trainerSnapshot.empty) {
-            const trainerData = trainerSnapshot.docs[0].data();
-            trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-          } else {
-            // If no trainer found, use memberId as fallback
-            trainerIdQuery = memberData.memberId;
-          }
+        const trainersQuery = query(
+          collection(db, 'trainer'),
+          where('email', '==', memberData.email)
+        );
+        
+        const trainerSnapshot = await getDocs(trainersQuery);
+        if (!trainerSnapshot.empty) {
+          const trainerData = trainerSnapshot.docs[0].data();
+          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
+        } else {
+          // 如果没有找到，则使用memberId作为fallback
+          console.warn("No trainer found, using memberId as fallback");
+          trainerIdQuery = memberData.memberId || 'T001';
         }
         
         console.log("Current trainer ID:", trainerIdQuery);
