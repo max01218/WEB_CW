@@ -61,13 +61,12 @@ export default function TrainerPage() {
   const { showLogin } = useLoginModal();
   const router = useRouter();
 
-  // 控制弹窗
+  // Control pop-up window
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTrainer, setCurrentTrainer] = useState<Trainer | null>(null);
   const [trainingGoal, setTrainingGoal] = useState("");
   const [notifications, setNotifications] = useState<
   Array<{ id: string; description: string; read: boolean; type: string }>>([]);
-
 
 
   useEffect(() => {
@@ -130,7 +129,7 @@ export default function TrainerPage() {
     }
     console.log(user)
     try {
-      // 查询当前用户是否已有“未完成”的请求
+      // Query whether the current user has any "uncompleted" requests.
       const q = query(
         collection(db, "requests"),
         where("memberId", "==", user.uid),
@@ -145,7 +144,7 @@ export default function TrainerPage() {
         return;
       }
   
-      // 提交新请求
+      // submit new requests
       await addDoc(collection(db, "requests"), {
         memberId: user.uid,
         memberName: user.email,
@@ -197,7 +196,7 @@ export default function TrainerPage() {
       const q = query(
         collection(db, "requests"),
         where("memberId", "==", user.uid),
-        orderBy("requestedAt", "desc") // 按时间降序
+        orderBy("requestedAt", "desc") // Sort by date in descending order
       );
       const snap = await getDocs(q);
   
@@ -206,7 +205,7 @@ export default function TrainerPage() {
         return;
       }
   
-      const latestRequest = snap.docs[0].data(); // 最新一条
+      const latestRequest = snap.docs[0].data(); // newest one
       const status = latestRequest.status;
   
       if (status === "accepted") {
@@ -234,13 +233,13 @@ export default function TrainerPage() {
       where('type', '==', 'rejected')
     );
     console.log((q as any)._query?.filters);
-   // onSnapshot 会实时推送增删改
+   // onSnapshot push updates, additions and modifications in real time.
    const unsubscribe = onSnapshot(q, (snap) => {
     const arr: any[] = [];
     snap.docs.forEach((d) => arr.push({ id: d.id, ...(d.data() as any) }));
     setNotifications(arr);
 
-    // 可选：新通知到来时弹出提示
+    // A prompt pops up when a new notice arrives.
     const newUnread = arr.filter((n) => !n.read);
     if (newUnread.length > 0) {
       message.info(`You have ${newUnread.length} new notification(s)`);
@@ -268,7 +267,7 @@ export default function TrainerPage() {
   );
   return (
     <div>
-      {/* 顶部 Header */}
+      {/* Header */}
       <header style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={logoStyle}>
