@@ -346,7 +346,7 @@ const ReceiveMemberPage = () => {
           title: 'Training Request Accepted',
           description: `Your training request with ${request.trainerName || 'Default Trainer'} has been accepted.`,
           date: Timestamp.now(),
-          type: 'system',
+          type: 'accepted',
           read: false,
           createdAt: Timestamp.now()
         });
