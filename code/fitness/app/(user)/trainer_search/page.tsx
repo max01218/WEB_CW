@@ -230,7 +230,7 @@ export default function TrainerPage() {
     const q = query(
       collection(db, 'notifications'),
       where('email', '==', user.email),
-      where('type', '==', 'rejected')
+      where('type', '==', ["rejected", "accepted"])
     );
     console.log((q as any)._query?.filters);
    // onSnapshot push updates, additions and modifications in real time.
