@@ -322,38 +322,19 @@ const ReceiveMemberPage = () => {
         
         console.log("Request status updated to 'accepted'");
         
-        // 2. 更新会员数据 - 设置trainerId
-        if (request.memberId) {
-          console.log("Updating member data with trainer ID");
-          const memberRef = doc(db, 'members', request.memberId);
-          const memberDoc = await getDoc(memberRef);
-          
-          if (memberDoc.exists()) {
-            await updateDoc(memberRef, {
-              trainerId: currentTrainerId,
-              updatedAt: Timestamp.now()
-            });
-            console.log(`Member data updated with trainerId: ${currentTrainerId}`);
-          } else {
-            console.warn("Member document does not exist:", request.memberId);
-          }
-        }
-        
-        // 3. 为会员创建通知
+        // 2. 为会员创建通知
         console.log("Creating notification for member");
         await addDoc(collection(db, 'notifications'), {
-          email: request.memberName || '',
-          title: 'Training Request Accepted',
-          description: `Your training request with ${request.trainerName || 'Default Trainer'} has been accepted.`,
-          date: Timestamp.now(),
-          type: 'system',
+          memberName: request.memberName,
+          requestedAt: request.requestedAt,
+          status: 'accepted',
           read: false,
-          createdAt: Timestamp.now()
+          description: `Your training request with ${request.trainerName || 'Default Trainer'} has been accepted.`
         });
         
         console.log("Notification created successfully");
         
-        // 4. 更新UI - 从列表中移除已接受的请求
+        // 3. 更新UI - 从列表中移除已接受的请求
         setRequests(prev => prev.filter(r => r.id !== request.id));
         message.success('Request accepted successfully');
       } catch (error: any) {
@@ -411,32 +392,25 @@ const ReceiveMemberPage = () => {
         
         console.log("Original request updated as rejected");
         
-
-        
-       
-        // 3. 为会员创建通知
+        // 2. 为会员创建通知
         console.log("Creating notification for member");
         const notificationData = {
-          email: currentRequest.memberName || '', // 使用memberName作为email
-          title: 'Training Request Rejected',
-          description: `Your request with ${currentRequest.trainerName || 'current trainer'} has been redirected to ${selectedTrainerData.name || 'alternative trainer'}.`,
-          date: Timestamp.now(),
-          type: 'rejected',
-          read: false, // 设置为未读
-          createdAt: Timestamp.now(),
-          requestId: currentRequest.id,
-          alternativeTrainerId: selectedTrainer
+          memberName: currentRequest.memberName,
+          requestedAt: currentRequest.requestedAt,
+          status: 'rejected',
+          read: false,
+          description: `Your request with ${currentRequest.trainerName || 'current trainer'} has been rejected with recommendation to ${selectedTrainerData.name || 'alternative trainer'}.`
         };
         
         await addDoc(collection(db, 'notifications'), notificationData);
-        console.log("Rejection notification created successfully:", notificationData);
+        console.log("Rejection notification created successfully");
         
-        // 4. 更新UI
+        // 3. 更新UI
         setRequests(prev => prev.filter(r => r.id !== currentRequest.id));
         setRejectionModalVisible(false);
         setCurrentRequest(null);
         setSelectedTrainer('');
-        message.success('Request redirected successfully');
+        message.success('Request rejected successfully');
       } catch (error: any) {
         console.error("Error updating database:", error);
         
@@ -445,7 +419,7 @@ const ReceiveMemberPage = () => {
         setRejectionModalVisible(false);
         setCurrentRequest(null);
         setSelectedTrainer('');
-        message.success('Request redirected');
+        message.success('Request rejected');
       }
     } catch (error) {
       console.error('Error redirecting request:', error);
