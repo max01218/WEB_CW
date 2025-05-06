@@ -108,69 +108,7 @@ const BookSessionPage = () => {
         });
       });
       
-      // Method 1.5: Check trainer document for trainees field
-      try {
-        console.log("Checking trainer document for trainees field");
-        // Query trainers collection for the specific trainer
-        const trainerQuery = query(
-          collection(db, 'trainer'),
-          where('trainerId', '==', trainerIdQuery)
-        );
-        
-        const trainerSnapshot = await getDocs(trainerQuery);
-        
-        for (const trainerDoc of trainerSnapshot.docs) {
-          const trainerData = trainerDoc.data();
-          console.log("Trainer data:", trainerData);
-          
-          // Check if trainees field exists and is an array or object
-          if (trainerData.trainees) {
-            console.log("Found trainees in trainer document:", trainerData.trainees);
-            
-            // Handle trainees as array
-            if (Array.isArray(trainerData.trainees)) {
-              for (const traineeId of trainerData.trainees) {
-                if (typeof traineeId === 'string') {
-                  // Fetch member data for this trainee
-                  try {
-                    const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                    if (memberDoc.exists()) {
-                      const memberData = memberDoc.data();
-                      memberMap.set(traineeId, {
-                        id: traineeId,
-                        email: memberData.email || "Unknown",
-                        name: memberData.name || memberData.email || "Unknown Member"
-                      });
-                    }
-                  } catch (err) {
-                    console.error("Error fetching trainee details:", err);
-                  }
-                }
-              }
-            } 
-            // Handle trainees as object with key-value pairs
-            else if (typeof trainerData.trainees === 'object') {
-              for (const [traineeId, traineeValue] of Object.entries(trainerData.trainees)) {
-                try {
-                  const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                  if (memberDoc.exists()) {
-                    const memberData = memberDoc.data();
-                    memberMap.set(traineeId, {
-                      id: traineeId,
-                      email: memberData.email || "Unknown",
-                      name: memberData.name || memberData.email || "Unknown Member"
-                    });
-                  }
-                } catch (err) {
-                  console.error("Error fetching trainee details:", err);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking trainer document:", error);
-      }
+      
       
       // Method 2: Get members from accepted requests as backup
       if (memberMap.size === 0) {
@@ -388,7 +326,7 @@ const BookSessionPage = () => {
         timeStart,
         timeEnd,
         duration: durationMinutes || 60,
-        status: 'scheduled' as 'scheduled' | 'cancelled' | 'completed',
+        status: selectedDate.isBefore(dayjs(), 'day') ? 'completed' : 'scheduled',
         notes: values.notes || '',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
@@ -404,6 +342,26 @@ const BookSessionPage = () => {
       // Add to Firestore
       const appointmentRef = await addDoc(collection(db, 'appointments'), appointment);
       console.log("Appointment saved with ID:", appointmentRef.id);
+      
+      // Create a record in the TrainingRecords collection
+      const trainingRecord = {
+        status: selectedDate.isBefore(dayjs(), 'day') ? 'completed' : 'scheduled',
+        courseType: values.courseType || 'General Fitness',
+        trainerId: trainerId,
+        memberId: selectedMember.id || '',
+        memberName: selectedMember.name || 'Unknown Member',
+        memberEmail: values.memberEmail || '',
+        duration: durationMinutes || 60,
+        date: Timestamp.fromDate(selectedDate.toDate()),
+        timeStart,
+        timeEnd,
+        notes: values.notes || '',
+        appointmentId: appointmentRef.id,
+        createdAt: Timestamp.now()
+      };
+      
+      await addDoc(collection(db, 'TrainingRecords'), trainingRecord);
+      console.log("Training record created for appointment:", appointmentRef.id);
       
       // Create notification for the member
       const notification = {

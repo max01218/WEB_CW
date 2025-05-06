@@ -281,6 +281,16 @@ const MemberHistoryPage = () => {
       // Convert appointments to training records format
       let records: TrainingRecord[] = appointmentsSnapshot.docs.map(doc => {
         const data = doc.data();
+        const appointmentDate = data.date?.toDate() || new Date();
+        let status = data.status || 'pending';
+        
+        // 如果日期已过且状态仍为scheduled，将其视为completed
+        if (status === 'scheduled' && appointmentDate < new Date()) {
+          status = 'completed';
+        } else if (status === 'scheduled') {
+          status = 'pending';
+        }
+        
         return {
           id: doc.id,
           memberEmail: data.memberEmail || '',
@@ -292,7 +302,7 @@ const MemberHistoryPage = () => {
           timeStart: data.timeStart || '00:00',
           timeEnd: data.timeEnd || '00:00',
           duration: data.duration || 0,
-          status: (data.status === 'scheduled' ? 'pending' : data.status) || 'pending',
+          status: status,
           notes: data.notes || '',
           createdAt: data.createdAt || Timestamp.now()
         } as TrainingRecord;
