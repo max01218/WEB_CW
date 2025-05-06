@@ -37,14 +37,21 @@ export default function HistoryPage() {
       console.log('Fetching training records for:', memberData.email);
       
       const recordsQuery = query(
-        collection(db, "trainingRecords"),
-        where("email", "==", memberData.email)
+        collection(db, "appointments"),
+        where("memberEmail", "==", memberData.email),
+        where("status", "==", "completed")
       );
 
       const querySnapshot = await getDocs(recordsQuery);
       const recordsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        duration: doc.data().duration,
+        email: doc.data().memberEmail,
+        memberId: doc.data().memberId,
+        sessionDate: doc.data().date,
+        status: doc.data().status,
+        trainerId: doc.data().trainerId,
+        session: doc.data().courseType
       })) as TrainingRecord[];
 
       console.log('Fetched records:', recordsData.length);

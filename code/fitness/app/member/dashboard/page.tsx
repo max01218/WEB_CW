@@ -191,8 +191,8 @@ const DashboardPage = () => {
     if (!user || !memberData) return;
 
     const trainingQuery = query(
-      collection(db, 'trainingRecords'),
-      where('email', '==', memberData.email),
+      collection(db, 'appointments'),
+      where('memberEmail', '==', memberData.email),
       where('status', '==', 'completed')
     );
 
@@ -206,7 +206,12 @@ const DashboardPage = () => {
 
       const records = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        duration: doc.data().duration,
+        email: doc.data().memberEmail,
+        sessionDate: doc.data().date,
+        status: doc.data().status,
+        session: doc.data().courseType,
+        courseType: doc.data().courseType
       })) as TrainingRecord[];
 
       calculateCourseProgress(records);

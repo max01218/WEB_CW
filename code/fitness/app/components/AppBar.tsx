@@ -36,7 +36,7 @@ export default function AppBar() {
         alignItems: 'center',
         gap: '16px'
       }}>
-        <h1 style={{ margin: 0, fontSize: '20px' }}>健身管理系统</h1>
+        <h1 style={{ margin: 0, fontSize: '20px' }}>Fitness Management System</h1>
       </div>
       
       <Space size="middle">

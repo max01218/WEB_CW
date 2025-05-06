@@ -224,25 +224,6 @@ export default function AppointmentsPage() {
               updatedAt: Timestamp.now()
             });
 
-            // 创建训练记录
-            const trainingRecord = {
-              memberEmail: appointment.memberEmail,
-              memberName: appointment.memberName,
-              trainerId: appointment.trainerId,
-              trainerName: appointment.trainerName,
-              courseType: appointment.courseType,
-              sessionDate: appointment.date,
-              timeStart: appointment.timeStart,
-              timeEnd: appointment.timeEnd,
-              duration: appointment.duration,
-              status: 'completed',
-              notes: appointment.notes,
-              createdAt: Timestamp.now()
-            };
-
-            // 添加训练记录
-            await addDoc(collection(db, "trainingRecords"), trainingRecord);
-
             // 创建通知
             const notification = {
               email: appointment.memberEmail,

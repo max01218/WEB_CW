@@ -75,16 +75,21 @@ export default function ProgressPage() {
       }
 
       const recordsQuery = query(
-        collection(db, "trainingRecords"),
-        where("email", "==", memberData.email),
+        collection(db, "appointments"),
+        where("memberEmail", "==", memberData.email),
         where("status", "==", "completed"),
-        where("sessionDate", ">=", Timestamp.fromDate(startDate))
+        where("date", ">=", Timestamp.fromDate(startDate))
       );
 
       const querySnapshot = await getDocs(recordsQuery);
       const recordsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        duration: doc.data().duration,
+        email: doc.data().memberEmail,
+        sessionDate: doc.data().date,
+        status: doc.data().status,
+        session: doc.data().courseType,
+        courseType: doc.data().courseType
       })) as TrainingRecord[];
 
       setRecords(recordsData);
