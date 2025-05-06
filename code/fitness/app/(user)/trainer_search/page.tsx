@@ -230,7 +230,8 @@ export default function TrainerPage() {
     const q = query(
       collection(db, 'notifications'),
       where('email', '==', user.email),
-      where('type', '==', ["rejected", "accepted"])
+      where('status', 'in', ["rejected", "accepted"]),
+      where('read', '==', false)
     );
     console.log((q as any)._query?.filters);
    // onSnapshot push updates, additions and modifications in real time.
@@ -251,9 +252,16 @@ export default function TrainerPage() {
   
   const unreadCount = notifications.filter(n => !n.read).length;
   const markAsRead = async (notifId: string) => {
+    console.log("Notif ID:", notifId);
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === notifId ? { ...n, read: true } : n
+      )
+    );  
     await updateDoc(doc(db, 'notifications', notifId), { read: true });
   };
-  const popoverContent = (
+  
+  const popoverContent = (  
     <List
       size="small"
       dataSource={notifications}

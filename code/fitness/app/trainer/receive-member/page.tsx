@@ -325,7 +325,7 @@ const ReceiveMemberPage = () => {
         // 2. 为会员创建通知
         console.log("Creating notification for member");
         await addDoc(collection(db, 'notifications'), {
-          memberName: request.memberName,
+          email: request.memberName,
           requestedAt: request.requestedAt,
           status: 'accepted',
           read: false,
@@ -395,7 +395,7 @@ const ReceiveMemberPage = () => {
         // 2. 为会员创建通知
         console.log("Creating notification for member");
         const notificationData = {
-          memberName: currentRequest.memberName,
+          email: currentRequest.memberName,
           requestedAt: currentRequest.requestedAt,
           status: 'rejected',
           read: false,
