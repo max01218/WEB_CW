@@ -292,41 +292,53 @@ const BookSessionPage = () => {
         return;
       }
       
-      // 直接从trainer集合获取trainerId
-      let trainerId: string;
+      // Get trainer ID
+      let trainerId: string = '';
+      let trainerName: string = '';
+      
       try {
-        // 从trainer集合中查询
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData?.email || '')
-        );
+        if (memberData?.email) {
+          const trainersQuery = query(
+            collection(db, 'trainer'),
+            where('email', '==', memberData.email)
+          );
+          
+          const trainerSnapshot = await getDocs(trainersQuery);
+          if (!trainerSnapshot.empty) {
+            const trainerDoc = trainerSnapshot.docs[0];
+            const trainerData = trainerDoc.data();
+            trainerId = trainerData.trainerId || trainerDoc.id;
+            trainerName = trainerData.name || memberData.name || 'Default Trainer';
+          } else {
+            // Fallback
+            trainerId = memberData.memberId || '';
+            trainerName = memberData.name || 'Default Trainer';
+          }
+        }
         
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerId = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // 使用memberId作为fallback
-          trainerId = memberData?.memberId || 'T001';
+        if (!trainerId) {
+          message.error('Unable to determine trainer ID. Please try again.');
+          return;
         }
       } catch (err) {
         console.error('Error finding trainerId:', err);
-        trainerId = 'T001'; // 默认值
+        message.error('Error finding trainer information');
+        return;
       }
       
-      // 确保所有字段都有值，避免undefined
+      // Create appointment data with all required fields
       const appointmentData = {
         memberEmail: values.memberEmail || '',
         memberName: selectedMember.name || 'Unknown Member',
         memberId: selectedMember.id || '',
         trainerId: trainerId,
-        trainerName: memberData?.name || 'Default Trainer',
+        trainerName: trainerName,
         courseType: values.courseType || 'General Fitness',
         date: Timestamp.fromDate(selectedDate.toDate()),
         timeStart,
         timeEnd,
         duration: durationMinutes || 60,
-        status: selectedDate.isBefore(dayjs(), 'day') ? 'completed' : 'scheduled',
+        status: 'scheduled',
         notes: values.notes || '',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
@@ -334,56 +346,72 @@ const BookSessionPage = () => {
       
       console.log("Saving appointment:", appointmentData);
       
-      // Add to Firestore - convert any potential undefined values to empty strings
-      const appointment = Object.fromEntries(
-        Object.entries(appointmentData).map(([key, value]) => [key, value === undefined ? '' : value])
-      ) as Appointment;
-      
-      // Add to Firestore
-      const appointmentRef = await addDoc(collection(db, 'appointments'), appointment);
-      console.log("Appointment saved with ID:", appointmentRef.id);
-      
-      // Create a record in the TrainingRecords collection
-      const trainingRecord = {
-        status: selectedDate.isBefore(dayjs(), 'day') ? 'completed' : 'scheduled',
-        courseType: values.courseType || 'General Fitness',
-        trainerId: trainerId,
-        memberId: selectedMember.id || '',
-        memberName: selectedMember.name || 'Unknown Member',
-        memberEmail: values.memberEmail || '',
-        duration: durationMinutes || 60,
-        date: Timestamp.fromDate(selectedDate.toDate()),
-        timeStart,
-        timeEnd,
-        notes: values.notes || '',
-        appointmentId: appointmentRef.id,
-        createdAt: Timestamp.now()
-      };
-      
-      await addDoc(collection(db, 'TrainingRecords'), trainingRecord);
-      console.log("Training record created for appointment:", appointmentRef.id);
-      
-      // Create notification for the member
-      const notification = {
-        email: values.memberEmail || '',
-        title: 'New Training Session Scheduled',
-        description: `You have a new ${values.courseType || 'training'} session on ${selectedDate.format('YYYY-MM-DD')} from ${timeStart} to ${timeEnd}.`,
-        date: Timestamp.now(),
-        type: 'appointment',
-        read: false,
-        appointmentId: appointmentRef.id,
-        trainerId: appointment.trainerId,
-        createdAt: Timestamp.now()
-      };
-      
-      await addDoc(collection(db, 'notifications'), notification);
+      // Add to Firestore appointments collection
+      let appointmentRef;
+      try {
+        appointmentRef = await addDoc(collection(db, 'appointments'), appointmentData);
+        console.log("Appointment saved with ID:", appointmentRef.id);
+        message.success('Appointment booked successfully');
+      } catch (error) {
+        console.error('Error creating appointment document:', error);
+        message.error('Failed to create appointment');
+        return;
+      }
       
       // Update local state
-      setAppointments([...appointments, { ...appointment, id: appointmentRef.id } as Appointment]);
+      setAppointments([...appointments, { ...appointmentData, id: appointmentRef.id } as Appointment]);
       
-      message.success('Appointment booked successfully');
+      // Try to create training record
+      try {
+        const trainingRecord = {
+          status: 'scheduled',
+          courseType: values.courseType || 'General Fitness',
+          trainerId: trainerId,
+          memberId: selectedMember.id || '',
+          memberName: selectedMember.name || 'Unknown Member',
+          memberEmail: values.memberEmail || '',
+          duration: durationMinutes || 60,
+          date: Timestamp.fromDate(selectedDate.toDate()),
+          timeStart,
+          timeEnd,
+          notes: values.notes || '',
+          appointmentId: appointmentRef.id,
+          createdAt: Timestamp.now()
+        };
+        
+        await addDoc(collection(db, 'TrainingRecords'), trainingRecord);
+        console.log("Training record created for appointment:", appointmentRef.id);
+      } catch (error) {
+        console.error('Error creating training record:', error);
+        // Continue even if training record creation fails
+      }
+      
+      // Try to create notification
+      try {
+        const notification = {
+          email: values.memberEmail || '',
+          title: 'New Training Session Scheduled',
+          description: `You have a new ${values.courseType || 'training'} session on ${selectedDate.format('YYYY-MM-DD')} from ${timeStart} to ${timeEnd}.`,
+          date: Timestamp.now(),
+          type: 'appointment',
+          read: false,
+          appointmentId: appointmentRef.id,
+          trainerId: trainerId,
+          createdAt: Timestamp.now()
+        };
+        
+        await addDoc(collection(db, 'notifications'), notification);
+      } catch (error) {
+        console.error('Error creating notification:', error);
+        // Continue even if notification creation fails
+      }
+      
       setIsModalVisible(false);
       form.resetFields();
+      
+      // Refresh appointments list
+      fetchAppointments();
+      
     } catch (error: any) {
       console.error('Error booking appointment:', error);
       message.error(`Failed to book appointment: ${error.message || 'Unknown error'}`);
