@@ -1,9 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Row, Col, Statistic, Typography, Spin } from 'antd';
-import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined } from '@ant-design/icons';
+import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification } from 'antd';
+import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined, BellOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
@@ -17,6 +17,8 @@ const TrainerDashboard = () => {
   const [upcomingSessions, setUpcomingSessions] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [cancelledSessions, setCancelledSessions] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const { memberData } = useAuth();
   const router = useRouter();
 
@@ -89,6 +91,35 @@ const TrainerDashboard = () => {
         
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
+        
+        // Fetch cancelled sessions
+        const cancelledQuery = query(
+          collection(db, 'appointments'),
+          where('trainerId', '==', trainerIdQuery),
+          where('status', '==', 'cancelled'),
+          orderBy('date', 'desc'),
+          limit(10)
+        );
+        
+        const cancelledSnapshot = await getDocs(cancelledQuery);
+        const cancelledData = cancelledSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setCancelledSessions(cancelledData);
+        
+        // Show notification for cancelled sessions if there are any
+        if (cancelledData.length > 0) {
+          cancelledData.forEach(session => {
+            notification.warning({
+              message: 'Session Cancelled',
+              description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
+              icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+              duration: 5
+            });
+          });
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -134,15 +165,46 @@ const TrainerDashboard = () => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <Title level={2} style={{ margin: 0 }}>Trainer Dashboard</Title>
-          <Button 
-            type="primary" 
-            danger 
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-          >
-            Logout
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <Badge count={cancelledSessions.length} overflowCount={99}>
+              <Button 
+                icon={<BellOutlined />} 
+                onClick={() => setShowNotifications(!showNotifications)}
+                type={showNotifications ? 'primary' : 'default'}
+              >
+                Notifications
+              </Button>
+            </Badge>
+            <Button 
+              type="primary" 
+              danger 
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
+          </div>
         </div>
+        
+        {showNotifications && cancelledSessions.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <Card title="Cancelled Sessions" style={{ marginBottom: '24px' }}>
+              <List
+                itemLayout="horizontal"
+                dataSource={cancelledSessions}
+                renderItem={item => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={<CloseCircleOutlined style={{ color: 'red', fontSize: '24px' }} />}
+                      title={`Session with ${item.memberEmail || 'a member'}`}
+                      description={`${new Date(item.date?.toDate()).toLocaleDateString()} from ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}`}
+                    />
+                  </List.Item>
+                )}
+              />
+            </Card>
+          </div>
+        )}
         
         {loading ? (
           <div style={{ textAlign: 'center', padding: '50px' }}>

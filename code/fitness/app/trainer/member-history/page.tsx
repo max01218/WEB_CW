@@ -294,7 +294,7 @@ const MemberHistoryPage = () => {
         return {
           id: doc.id,
           memberEmail: data.memberEmail || '',
-          memberName: data.memberName || 'Unknown Member',
+          memberName: data.trainerName || 'Unknown Trainer',
           trainerId: data.trainerId || trainerIdQuery,
           trainerName: data.trainerName || 'Unknown Trainer',
           courseType: data.courseType || 'General Training',
@@ -334,7 +334,7 @@ const MemberHistoryPage = () => {
           return {
             id: doc.id,
             memberEmail: data.memberEmail || '',
-            memberName: data.memberName || 'Unknown Member',
+            memberName: data.trainerName || 'Unknown Trainer',
             trainerId: data.trainerId || trainerIdQuery,
             trainerName: data.trainerName || 'Unknown Trainer',
             courseType: data.courseType || 'General Training',
