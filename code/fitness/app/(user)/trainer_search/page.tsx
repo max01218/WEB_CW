@@ -94,6 +94,16 @@ export default function TrainerPage() {
     fetchTrainers();
   }, []);
 
+  useEffect(() => {
+    const namePrefix = searchNamePrefix.trim().toLowerCase();
+    const trainerIdKeyword = searchTrainerId.trim().toLowerCase();
+  
+    if (!namePrefix && !trainerIdKeyword) {
+      setFilteredTrainers(allTrainers);
+      setCurrentPage(1);
+    }
+  }, [searchNamePrefix, searchTrainerId, allTrainers]);
+  
   const handleAdvancedSearch = () => {
     const namePrefix = searchNamePrefix.trim().toLowerCase();
     const trainerIdKeyword = searchTrainerId.trim().toLowerCase();
