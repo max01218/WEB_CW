@@ -12,12 +12,23 @@ import { auth } from '@/lib/firebase';
 
 const { Title, Text } = Typography;
 
+// Define interface for cancelled session data
+interface CancelledSession {
+  id: string;
+  memberEmail?: string;
+  timeStart?: string;
+  timeEnd?: string;
+  date?: any;
+  trainerName?: string;
+  status?: string;
+}
+
 const TrainerDashboard = () => {
   const [pendingRequests, setPendingRequests] = useState(0);
   const [upcomingSessions, setUpcomingSessions] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [cancelledSessions, setCancelledSessions] = useState<any[]>([]);
+  const [cancelledSessions, setCancelledSessions] = useState<CancelledSession[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const { memberData } = useAuth();
   const router = useRouter();
@@ -93,32 +104,40 @@ const TrainerDashboard = () => {
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
         // Fetch cancelled sessions
-        const cancelledQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
-          where('status', '==', 'cancelled'),
-          orderBy('date', 'desc'),
-          limit(10)
-        );
-        
-        const cancelledSnapshot = await getDocs(cancelledQuery);
-        const cancelledData = cancelledSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setCancelledSessions(cancelledData);
-        
-        // Show notification for cancelled sessions if there are any
-        if (cancelledData.length > 0) {
-          cancelledData.forEach(session => {
-            notification.warning({
-              message: 'Session Cancelled',
-              description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
-              icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-              duration: 5
+        try {
+          const cancelledQuery = query(
+            collection(db, 'appointments'),
+            where('trainerId', '==', trainerIdQuery),
+            where('status', '==', 'cancelled'),
+            orderBy('date', 'desc'),
+            limit(10)
+          );
+          
+          const cancelledSnapshot = await getDocs(cancelledQuery);
+          const cancelledData = cancelledSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as CancelledSession[];
+          
+          setCancelledSessions(cancelledData);
+          
+          // Show notification for cancelled sessions if there are any
+          if (cancelledData.length > 0) {
+            cancelledData.forEach(session => {
+              try {
+                notification.warning({
+                  message: 'Session Cancelled',
+                  description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
+                  icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+                  duration: 5
+                });
+              } catch (error) {
+                console.error('Error showing notification:', error);
+              }
             });
-          });
+          }
+        } catch (error) {
+          console.error('Error fetching cancelled sessions:', error);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -192,12 +211,15 @@ const TrainerDashboard = () => {
               <List
                 itemLayout="horizontal"
                 dataSource={cancelledSessions}
-                renderItem={item => (
+                renderItem={(item: CancelledSession) => (
                   <List.Item>
                     <List.Item.Meta
                       avatar={<CloseCircleOutlined style={{ color: 'red', fontSize: '24px' }} />}
                       title={`Session with ${item.memberEmail || 'a member'}`}
-                      description={`${new Date(item.date?.toDate()).toLocaleDateString()} from ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}`}
+                      description={item.date && item.date.toDate ? 
+                        `${new Date(item.date.toDate()).toLocaleDateString()} from ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}` :
+                        `From ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}`
+                      }
                     />
                   </List.Item>
                 )}
