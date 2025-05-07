@@ -11,7 +11,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import dayjs from 'dayjs';
 
@@ -58,108 +58,85 @@ const RegisterPage = () => {
     marginBottom: '16px',
   };
 
+  const googleProvider = new GoogleAuthProvider();
+  googleProvider.setCustomParameters({
+    prompt: 'select_account'
+  });
+
   const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
-      const result = await signInWithPopup(auth, provider);
-      
-      if (!result.user) {
-        throw new Error('No user data returned');
-      }
+      setLoading(true);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-      // 检查用户是否已存在
-      const userRef = doc(db, 'members', result.user.uid);
-      const userSnap = await getDoc(userRef);
+      // Check if user already exists
+      const userDoc = await getDoc(doc(db, 'members', user.uid));
 
-      if (!userSnap.exists()) {
-        // 创建新用户数据
-        const userData = {
-          email: result.user.email,
-          name: result.user.displayName || 'User',
-          birthdate: null,
-          address: '',
-          appointmentStatus: false,
+      if (!userDoc.exists()) {
+        // Create new user data
+        const newUserData = {
+          memberId: user.uid,
+          email: user.email,
+          name: user.displayName || 'Unnamed Member',
           role: 'member',
           status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          uid: result.user.uid,
-          emailVerified: true, // Google 登录的用户邮箱已验证
+          birthday: null,
+          address: '',
+          trainerId: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          emailVerified: true, // Email is verified for Google login users
         };
 
-        await setDoc(userRef, userData);
-        message.success('Account created successfully!');
-        message.warning('Your appointment request is pending approval. Please wait for admin approval.');
-        router.push('/home');
-        return;
-      } else {
-        const userData = userSnap.data();
-        if (!userData.appointmentStatus) {
-          message.warning('Your appointment request is still pending approval. Please wait for admin approval.');
-          router.push('/home');
-          return;
-        }
-        message.success('Welcome back!');
-        router.push('/member/dashboard');
+        await setDoc(doc(db, 'members', user.uid), newUserData);
       }
+
+      router.push('/member/dashboard');
     } catch (error: any) {
       console.error('Google sign in error:', error);
-      if (error.code === 'auth/operation-not-allowed') {
-        message.error('Google sign in is not enabled. Please contact administrator.');
-      } else if (error.code === 'auth/popup-blocked') {
-        message.error('Popup was blocked by your browser. Please allow popups for this site.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        message.info('Sign in was cancelled');
-      } else {
-        message.error('Failed to sign in with Google. Please try again.');
-      }
+      message.error(error.message || 'Failed to sign in with Google');
     } finally {
-      setGoogleLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleRegister = async (values: any) => {
+  const handleSubmit = async (values: any) => {
     setLoading(true);
     try {
-      // 创建 Firebase Auth 用户
+      // Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
         values.password
       );
+      const user = userCredential.user;
 
-      // 发送验证邮件
-      await sendEmailVerification(userCredential.user);
-      message.info('Verification email sent. Please check your inbox.');
+      // Send verification email
+      await sendEmailVerification(user);
 
-      // 准备用户数据
+      // Prepare user data
       const userData = {
+        memberId: user.uid,
         email: values.email,
         name: values.name,
-        birthdate: dayjs(values.birthdate).format('YYYY-MM-DD'),
-        address: values.address || '',
-        appointmentStatus: false,
         role: 'member',
         status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        uid: userCredential.user.uid,
-        emailVerified: false,
+        birthday: null,
+        address: '',
+        trainerId: '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        emailVerified: false
       };
 
-      // 存储用户数据到 Firestore
-      await setDoc(doc(db, 'members', userCredential.user.uid), userData);
+      // Store user data in Firestore
+      await setDoc(doc(db, 'members', user.uid), userData);
 
       message.success('Registration successful! Please verify your email.');
       router.push('/login');
     } catch (error: any) {
       console.error('Registration error:', error);
-      message.error(error.message || 'Registration failed');
+      message.error(error.message || 'Failed to register');
     } finally {
       setLoading(false);
     }
@@ -189,7 +166,7 @@ const RegisterPage = () => {
 
         <Form
           layout="vertical"
-          onFinish={handleRegister}
+          onFinish={handleSubmit}
           disabled={loading}
         >
           <Form.Item

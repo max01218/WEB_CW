@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification } from 'antd';
+import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification, message } from 'antd';
 import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined, BellOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
@@ -42,12 +42,52 @@ const TrainerDashboard = () => {
     }
   };
 
+  // Get trainerId directly from trainer collection
+  const getTrainerId = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    if (memberData.trainerId) {
+      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    if (memberData.memberId) {
+      console.log("Using ID from memberData.memberId:", memberData.memberId);
+      return memberData.memberId;
+    }
+
+    try {
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If no trainer found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!memberData) return;
       
       setLoading(true);
       try {
+<<<<<<< HEAD
         // Get trainerId directly from the trainer collection
         let trainerIdQuery: string;
         
@@ -68,10 +108,12 @@ const TrainerDashboard = () => {
         
         console.log("Current trainer ID:", trainerIdQuery);
         
+=======
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         // Fetch pending requests count
         const requestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('status', '==', 'pending')
         );
         
@@ -81,7 +123,7 @@ const TrainerDashboard = () => {
         // Fetch accepted requests count for total members
         const acceptedRequestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('status', '==', 'accepted')
         );
         
@@ -95,7 +137,7 @@ const TrainerDashboard = () => {
         
         const appointmentsQuery = query(
           collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('date', '>=', todayTimestamp),
           where('status', '==', 'scheduled')
         );
@@ -103,6 +145,7 @@ const TrainerDashboard = () => {
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
+<<<<<<< HEAD
         // Get cancelled appointments - directly from appointments database
         try {
           console.log("Getting cancelled appointments:", trainerIdQuery);
@@ -159,6 +202,33 @@ const TrainerDashboard = () => {
           }
         } catch (error) {
           console.error('Error getting cancelled appointments:', error);
+=======
+        // Fetch cancelled sessions
+        const cancelledQuery = query(
+          collection(db, 'appointments'),
+          where('trainerId', '==', await getTrainerId()),
+          where('status', '==', 'cancelled'),
+          orderBy('date', 'desc'),
+          limit(10)
+        );
+        const cancelledSnapshot = await getDocs(cancelledQuery);
+        const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCancelledSessions(cancelledData);
+        
+        // Show notification for cancelled sessions if there are any
+        if (cancelledData.length > 0) {
+          cancelledData.forEach(session => {
+            notification.warning({
+              message: 'Session Cancelled',
+              description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
+              icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+              duration: 5
+            });
+          });
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);

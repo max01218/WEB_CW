@@ -41,7 +41,7 @@ const LoginPage = () => {
 
   const getUserRole = async (email: string): Promise<string> => {
     try {
-      // 使用 email 字段查询 members 集合
+      // Query members collection using email field
       const membersQuery = query(
         collection(db, 'members'),
         where('email', '==', email),
@@ -58,10 +58,10 @@ const LoginPage = () => {
           return 'member';
         }
         
-        // 不转换为小写，保持原始角色值
+        // Keep original role value without converting to lowercase
         const role = userData.role;
         
-        // 更新有效角色列表，移除 supervisor，添加 admin
+        // Update valid roles list, remove supervisor, add admin
         const validRoles = ['trainer', 'member', 'admin'];
         if (!validRoles.includes(role)) {
           return 'member';
@@ -87,11 +87,11 @@ const LoginPage = () => {
       if (!result.user) {
         throw new Error('No user data returned');
       }
-      // 检查用户是否已存在
+      // Check if user exists
       const userRef = doc(db, 'members', result.user.uid);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
-        // 创建新用户数据
+        // Create new user data
         const userData = {
           email: result.user.email,
           name: result.user.displayName || 'User',
@@ -150,7 +150,7 @@ const LoginPage = () => {
                   router.push('/trainer_search');
                 }
               } else {
-                // 没有request记录
+                // No request record
                 message.success('Please choose your personal trainer.');
                 router.push('/trainer_search');
               }
@@ -183,13 +183,13 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // 检查邮箱是否已验证
+      // Check if email is verified
       if (!userCredential.user.emailVerified) {
         message.error('Please verify your email before logging in. Check your inbox for the verification link.');
         router.push('/home');
         return;
       }
-      // 获取用户数据
+      // Get user data
       const userRef = doc(db, 'members', userCredential.user.uid);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
@@ -233,7 +233,7 @@ const LoginPage = () => {
                   router.push('/trainer_search');
                 }
               } else {
-                // 没有request记录
+                // No request record
                 message.success('Please choose your personal trainer.');
                 router.push('/trainer_search');
               }
@@ -246,7 +246,7 @@ const LoginPage = () => {
         }
       }
     } catch (error: any) {
-      console.error('帳密登入錯誤:', error);
+      console.error('Login error:', error);
       if (error.code === 'auth/invalid-credential') {
         message.error('Invalid email or password.');
       } else {

@@ -113,7 +113,7 @@ export default function NotificationPopover() {
                       icon={<CheckOutlined />}
                       onClick={() => markAsRead(item.id)}
                     >
-                      标记已读
+                      Mark as Read
                     </Button>
                   )}
                 </div>
@@ -129,7 +129,7 @@ export default function NotificationPopover() {
         />
       ) : (
         <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-          暂无通知
+          No notifications
         </div>
       )}
     </div>
@@ -138,7 +138,7 @@ export default function NotificationPopover() {
   return (
     <Popover
       content={content}
-      title="通知中心"
+      title="Notification Center"
       trigger="click"
       placement="bottomRight"
       overlayStyle={{ width: 300 }}

@@ -82,7 +82,7 @@ interface Notification {
   read: boolean;
 }
 
-// 添加一个辅助函数来编码邮箱地址
+// Add a helper function to encode email address
 const encodeEmail = (email: string) => {
   return email.replace(/[.@]/g, '_');
 };
@@ -147,7 +147,7 @@ const DashboardPage = () => {
     }
   };
 
-  // 监听预约变化
+  // Listen for appointment changes
   useEffect(() => {
     if (!user || !memberData) return;
 
@@ -158,7 +158,7 @@ const DashboardPage = () => {
       where('status', '==', 'scheduled')
     );
 
-    // 设置实时监听
+    // Set up real-time listener
     const unsubscribeAppointments = onSnapshot(appointmentQuery, (snapshot) => {
       const upcomingAppointments = snapshot.docs.filter(doc => {
         const data = doc.data();
@@ -167,7 +167,7 @@ const DashboardPage = () => {
         
         if (appointmentDate instanceof Timestamp) {
           const appointmentDateTime = appointmentDate.toDate();
-          // 设置预约结束时间
+          // Set appointment end time
           const [hours, minutes] = appointmentEndTime.split(':').map(Number);
           appointmentDateTime.setHours(hours, minutes, 0, 0);
           return appointmentDateTime > now;
@@ -186,7 +186,7 @@ const DashboardPage = () => {
     };
   }, [user, memberData]);
 
-  // 监听训练记录变化
+  // Listen for training record changes
   useEffect(() => {
     if (!user || !memberData) return;
 
@@ -196,7 +196,7 @@ const DashboardPage = () => {
       where('status', '==', 'completed')
     );
 
-    // 设置实时监听
+    // Set up real-time listener
     const unsubscribeTraining = onSnapshot(trainingQuery, (snapshot) => {
       const completedTrainings = snapshot.docs.length;
       const totalMinutes = snapshot.docs.reduce(
@@ -235,13 +235,13 @@ const DashboardPage = () => {
       const notificationRef = doc(db, 'notifications', notificationId);
       await updateDoc(notificationRef, { read: true });
       
-      // 本地状态会通过 onSnapshot 自动更新
+      // Local state will be automatically updated through onSnapshot
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   };
 
-  // 监听通知变化
+  // Listen for notification changes
   useEffect(() => {
     if (!memberData?.email) return;
 
@@ -252,7 +252,7 @@ const DashboardPage = () => {
       orderBy('createdAt', 'desc')
     );
     
-    // 设置实时监听
+    // Set up real-time listener
     const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
       const notificationsList = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -265,7 +265,7 @@ const DashboardPage = () => {
         unreadNotifications: notificationsList.length
       }));
 
-      // 如果有新通知，显示提醒
+      // If there are new notifications, show a reminder
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const notification = change.doc.data();
@@ -306,9 +306,11 @@ const DashboardPage = () => {
   const handleLogout = async () => {
     try {
       await signOut();
-      router.push('/login');
+      message.success('Logged out successfully');
+      router.push('/');
     } catch (error) {
       console.error('Logout error:', error);
+      message.error('Failed to logout. Please try again.');
     }
   };
 
@@ -427,6 +429,7 @@ const DashboardPage = () => {
 
   const handleEditProfile = () => {
     router.push('/member/profile');
+    message.info('Redirecting to profile page...');
   };
 
   if (loading) {

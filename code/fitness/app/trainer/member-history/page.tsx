@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Progress, message, Spin, Tag, Typography, Select, DatePicker } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, Timestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, getDoc, doc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
@@ -19,13 +19,12 @@ interface TrainingRecord {
   trainerId: string;
   trainerName: string;
   courseType: string;
-  sessionDate: any;
+  date: Date;
   timeStart: string;
   timeEnd: string;
   duration: number;
-  status: 'completed' | 'cancelled' | 'pending';
+  status: string;
   notes: string;
-  createdAt: any;
 }
 
 interface Member {
@@ -51,10 +50,46 @@ const MemberHistoryPage = () => {
   const { memberData } = useAuth();
   const router = useRouter();
 
+  const getTrainerId = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    // Prioritize trainerId from memberData, if not available try to query from trainer collection
+    if (memberData.trainerId) {
+      console.log("Using trainerId from memberData:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    // If no trainerId in memberData, try to query from trainer collection
+    try {
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If still not found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
   const fetchMembers = async () => {
     if (!memberData) return;
     
     try {
+<<<<<<< HEAD
       // Prioritize using trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = memberData.trainerId;
 
@@ -76,165 +111,67 @@ const MemberHistoryPage = () => {
         }
       }
       
+=======
+      // Prioritize trainerId from memberData, if not available try to query from trainer collection
+      let trainerIdQuery = await getTrainerId();
+
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       console.log("Current trainer ID:", trainerIdQuery);
       
       // Store all members in this map
-      const memberMap = new Map<string, Member>();
+      const membersMap = new Map<string, Member>();
       
-      // Method 1: Get members directly from members collection who have this trainer assigned
-      console.log("Trying to get members with trainerId field");
-      const membersQuery = query(
-        collection(db, 'members'),
+      // Get all appointments for this trainer
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
         where('trainerId', '==', trainerIdQuery)
       );
       
-      const membersSnapshot = await getDocs(membersQuery);
-      console.log(`Found ${membersSnapshot.docs.length} members with trainerId=${trainerIdQuery}`);
+      const appointmentsSnapshot = await getDocs(appointmentsQuery);
+      console.log(`Found ${appointmentsSnapshot.docs.length} appointments`);
       
-      // Add members to the map
-      membersSnapshot.docs.forEach(doc => {
-        const memberData = doc.data();
-        const memberId = doc.id;
-        
-        memberMap.set(memberId, {
-          id: memberId,
-          email: memberData.email || "Unknown",
-          name: memberData.name || memberData.email || "Unknown Member"
-        });
+      // Get unique member emails from appointments
+      const memberEmails = new Set<string>();
+      appointmentsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.memberEmail) {
+          memberEmails.add(data.memberEmail);
+        }
       });
       
-      // Method 2: Check trainer document for trainees field
-      try {
-        console.log("Checking trainer document for trainees field");
-        // Query trainers collection for the specific trainer
-        const trainerQuery = query(
-          collection(db, 'trainer'),
-          where('trainerId', '==', trainerIdQuery)
-        );
-        
-        const trainerSnapshot = await getDocs(trainerQuery);
-        
-        for (const trainerDoc of trainerSnapshot.docs) {
-          const trainerData = trainerDoc.data();
-          console.log("Trainer data:", trainerData);
-          
-          // Check if trainees field exists and is an array or object
-          if (trainerData.trainees) {
-            console.log("Found trainees in trainer document:", trainerData.trainees);
-            
-            // Handle trainees as array
-            if (Array.isArray(trainerData.trainees)) {
-              for (const traineeId of trainerData.trainees) {
-                if (typeof traineeId === 'string') {
-                  // Fetch member data for this trainee
-                  try {
-                    const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                    if (memberDoc.exists()) {
-                      const memberData = memberDoc.data();
-                      memberMap.set(traineeId, {
-                        id: traineeId,
-                        email: memberData.email || "Unknown",
-                        name: memberData.name || memberData.email || "Unknown Member"
-                      });
-                    }
-                  } catch (err) {
-                    console.error("Error fetching trainee details:", err);
-                  }
-                }
-              }
-            } 
-            // Handle trainees as object with key-value pairs
-            else if (typeof trainerData.trainees === 'object') {
-              for (const [traineeId, traineeValue] of Object.entries(trainerData.trainees)) {
-                try {
-                  const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                  if (memberDoc.exists()) {
-                    const memberData = memberDoc.data();
-                    memberMap.set(traineeId, {
-                      id: traineeId,
-                      email: memberData.email || "Unknown",
-                      name: memberData.name || memberData.email || "Unknown Member"
-                    });
-                  }
-                } catch (err) {
-                  console.error("Error fetching trainee details:", err);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking trainer document:", error);
-      }
+      console.log(`Found ${memberEmails.size} unique member emails`);
       
-      // Method 3: Get members from accepted requests
-      if (memberMap.size === 0) {
-        console.log("Trying to get members from accepted requests");
-        const requestsQuery = query(
-          collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
-          where('status', '==', 'accepted')
-        );
-        
-        const querySnapshot = await getDocs(requestsQuery);
-        console.log(`Found ${querySnapshot.docs.length} accepted requests`);
-        
-        querySnapshot.docs.forEach(doc => {
-          const request = doc.data();
-          const memberId = request.memberId;
-          
-          if (!memberMap.has(memberId)) {
-            memberMap.set(memberId, {
-              id: memberId,
-              email: request.memberName,
-              name: request.memberName
-            });
-          }
-        });
-      }
-      
-      // Method 4: If still no members found, fetch all active members as fallback
-      if (memberMap.size === 0) {
-        console.log("Trying to get all active members as fallback");
-        const allMembersQuery = query(
+      // Get member details for each email
+      for (const email of memberEmails) {
+        const memberQuery = query(
           collection(db, 'members'),
-          where('role', '==', 'member'),
-          where('status', '==', 'active')
+          where('email', '==', email)
         );
         
-        const allMembersSnapshot = await getDocs(allMembersQuery);
-        console.log(`Found ${allMembersSnapshot.docs.length} active members`);
-        
-        allMembersSnapshot.docs.forEach(doc => {
-          const memberData = doc.data();
-          const memberId = doc.id;
-          
-          memberMap.set(memberId, {
-            id: memberId,
-            email: memberData.email || "Unknown",
-            name: memberData.name || memberData.email || "Unknown Member"
+        const memberSnapshot = await getDocs(memberQuery);
+        if (!memberSnapshot.empty) {
+          const memberDoc = memberSnapshot.docs[0];
+          const memberData = memberDoc.data() as Member;
+          membersMap.set(email, {
+            ...memberData,
+            id: memberDoc.id
           });
-        });
+        }
       }
       
-      const membersList = Array.from(memberMap.values());
-      console.log("Final members list:", membersList);
-      setMembers(membersList);
-      
-      if (membersList.length === 0) {
-        message.warning('No members found for this trainer. Please accept member requests first.');
-      }
+      console.log(`Successfully loaded ${membersMap.size} member details`);
+      setMembers(Array.from(membersMap.values()));
     } catch (error) {
       console.error('Error fetching members:', error);
       message.error('Failed to load members');
     }
   };
 
-  const fetchTrainingRecords = async (memberId?: string, dateStart?: any, dateEnd?: any) => {
+  const fetchTrainingRecords = async (memberId: string) => {
     if (!memberData) return;
     
-    setLoading(true);
     try {
+<<<<<<< HEAD
       // Prioritize using trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = memberData.trainerId;
 
@@ -274,11 +211,22 @@ const MemberHistoryPage = () => {
           collection(db, 'appointments'),
           where('trainerId', '==', trainerIdQuery)
         );
+=======
+      // Prioritize trainerId from memberData, if not available try to query from trainer collection
+      let trainerIdQuery = await getTrainerId();
+
+      console.log("Fetching training records for trainer:", trainerIdQuery, "member:", memberId);
+      
+      // Get member's email first
+      const memberDoc = await getDoc(doc(db, 'members', memberId));
+      if (!memberDoc.exists()) {
+        throw new Error('Member not found');
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       }
       
-      const appointmentsSnapshot = await getDocs(appointmentsQuery);
-      console.log(`Found ${appointmentsSnapshot.docs.length} appointments`);
+      const memberEmail = memberDoc.data().email;
       
+<<<<<<< HEAD
       // Convert appointments to training record format
       let records: TrainingRecord[] = appointmentsSnapshot.docs.map(doc => {
         const data = doc.data();
@@ -297,25 +245,65 @@ const MemberHistoryPage = () => {
           }
         } else if (data.status === 'completed') {
           status = 'completed';
+=======
+      // Get all appointments for this member with this trainer
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
+        where('trainerId', '==', trainerIdQuery),
+        where('memberEmail', '==', memberEmail),
+        orderBy('date', 'desc')
+      );
+      
+      const appointmentsSnapshot = await getDocs(appointmentsQuery);
+      console.log(`Found ${appointmentsSnapshot.docs.length} appointments for member ${memberId}`);
+      
+      const records = appointmentsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const appointmentDate = data.date.toDate();
+        let status = data.status || 'pending';
+        
+        // If date has passed and status is still scheduled, treat it as completed
+        if (appointmentDate < new Date() && status === 'scheduled') {
+          status = 'completed';
+        } else if (status === 'scheduled') {
+          const now = new Date();
+          const appointmentTime = new Date(appointmentDate);
+          appointmentTime.setHours(
+            parseInt(data.timeEnd.split(':')[0]),
+            parseInt(data.timeEnd.split(':')[1])
+          );
+          if (now > appointmentTime) {
+            status = 'completed';
+          }
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         }
         
         return {
           id: doc.id,
+<<<<<<< HEAD
           memberEmail: data.memberEmail || '',
           memberName: data.trainerName || 'Unknown Trainer', // Use trainerName as display name
           trainerId: data.trainerId || trainerIdQuery,
           trainerName: data.trainerName || 'Unknown Trainer',
           courseType: data.courseType || 'General Training',
           sessionDate: data.date || Timestamp.now(),
+=======
+          memberEmail: memberEmail,
+          memberName: memberDoc.data().name || 'Unknown Member',
+          trainerId: trainerIdQuery,
+          trainerName: memberData?.name || 'Current Trainer',
+          date: appointmentDate,
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
           timeStart: data.timeStart || '00:00',
           timeEnd: data.timeEnd || '00:00',
           duration: data.duration || 0,
           status: status,
-          notes: data.notes || '',
-          createdAt: data.createdAt || Timestamp.now()
+          courseType: data.courseType || 'General Training',
+          notes: data.notes || ''
         } as TrainingRecord;
       });
       
+<<<<<<< HEAD
       // Filter by date
       if (dateStart && dateEnd) {
         console.log("Filtering by date range:", dateStart, dateEnd);
@@ -355,17 +343,21 @@ const MemberHistoryPage = () => {
       });
       
       console.log("Final training records:", records);
+=======
+      console.log(`Successfully processed ${records.length} training records`);
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       setTrainingRecords(records);
-      
-      calculateCourseProgress(records);
     } catch (error) {
       console.error('Error fetching training records:', error);
       message.error('Failed to load training records');
+<<<<<<< HEAD
       // Set empty array to prevent UI errors
       setTrainingRecords([]);
       setCourseProgress({});
     } finally {
       setLoading(false);
+=======
+>>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
     }
   };
 
@@ -423,12 +415,8 @@ const MemberHistoryPage = () => {
   }, [memberData]);
 
   useEffect(() => {
-    fetchTrainingRecords(
-      selectedMember || undefined, 
-      dateRange[0] || undefined, 
-      dateRange[1] || undefined
-    );
-  }, [selectedMember, dateRange, memberData]);
+    fetchTrainingRecords(selectedMember);
+  }, [selectedMember, memberData]);
 
   const handleMemberChange = (value: string) => {
     setSelectedMember(value);
@@ -488,7 +476,7 @@ const MemberHistoryPage = () => {
       render: (_: any, record: TrainingRecord) => (
         <div>
           <div>
-            {record.sessionDate.toDate().toLocaleDateString()}
+            {record.date.toLocaleDateString()}
           </div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
             {record.timeStart} - {record.timeEnd}

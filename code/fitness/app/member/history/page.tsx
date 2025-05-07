@@ -11,13 +11,13 @@ import { useRouter } from 'next/navigation';
 
 interface TrainingRecord {
   id: string;
-  duration: number;  // 訓練時長（分鐘）
+  duration: number;  // Training duration (minutes)
   email: string;
   memberId: string;
-  sessionDate: string | Timestamp;  // 訓練日期
+  sessionDate: string | Timestamp;  // Training date
   status: 'completed' | 'cancelled' | 'pending';
   trainerId: string;
-  session?: string;  // 訓練課程類型
+  session?: string;  // Training course type
 }
 
 export default function HistoryPage() {
@@ -26,7 +26,7 @@ export default function HistoryPage() {
   const { user, memberData, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // 獲取訓練記錄
+  // Get training records
   const fetchTrainingRecords = async () => {
     try {
       if (!user || !memberData) {
@@ -154,7 +154,7 @@ export default function HistoryPage() {
     }
   ];
 
-  // 顯示載入中
+  // Show loading
   if (authLoading || loading) {
     return (
       <div style={{ 
@@ -164,12 +164,12 @@ export default function HistoryPage() {
         alignItems: 'center',
         background: '#f0f2f5'
       }}>
-        <Spin size="large" tip="載入中..." />
+        <Spin size="large" tip="Loading..." />
       </div>
     );
   }
 
-  // 未登入時顯示
+  // Show when not logged in
   if (!user) {
     return (
       <div style={{ 
@@ -188,7 +188,7 @@ export default function HistoryPage() {
     );
   }
 
-  // 等待會員資料
+  // Waiting for member data
   if (!memberData) {
     return (
       <div style={{ 

@@ -97,7 +97,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ visible, onClose }) => {
         return;
       }
 
-      // 获取用户数据
+      // Get user data
       const userRef = doc(db, 'members', userCredential.user.uid);
       const userSnap = await getDoc(userRef);
       

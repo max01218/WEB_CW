@@ -482,6 +482,84 @@ const BookSessionPage = () => {
     );
   };
 
+  const getTrainerId = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    if (memberData.trainerId) {
+      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    if (memberData.memberId) {
+      console.log("Using ID from memberData.memberId:", memberData.memberId);
+      return memberData.memberId;
+    }
+
+    try {
+      // Query trainerId directly from trainer collection
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If no trainer found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
+  const fetchTrainerData = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    if (memberData.trainerId) {
+      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    if (memberData.memberId) {
+      console.log("Using ID from memberData.memberId:", memberData.memberId);
+      return memberData.memberId;
+    }
+
+    try {
+      // Get trainerId directly from trainer collection
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If no trainer found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
   return (
     <div style={{ padding: '24px', background: '#f5f5f5', minHeight: '100vh' }}>
       <div style={{ 

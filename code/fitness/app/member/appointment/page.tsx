@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 interface Appointment {
   id: string;
   memberEmail: string;
+  memberName: string;
   trainerId: string;
   trainerName: string;
   courseType: string;
@@ -21,6 +22,7 @@ interface Appointment {
   notes: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  duration: number;
 }
 
 const encodeEmail = (email: string) => {
@@ -55,7 +57,7 @@ export default function AppointmentsPage() {
         };
       }) as Appointment[];
 
-      // 只顯示 scheduled 狀態
+      // Only show appointments with "scheduled" status
       setAppointments(appointmentsData.filter(item => item.status === "scheduled"));
     } catch (error) {
       console.error("Error fetching appointments:", error);
@@ -65,80 +67,92 @@ export default function AppointmentsPage() {
     }
   };
 
-  // const addTestAppointment = async () => {
-  //   if (!memberData) {
-  //     message.error('Please log in first.');
-  //     return;
-  //   }
+  const addTestAppointment = async () => {
+    if (!memberData) {
+      message.error('Please log in first.');
+      return;
+    }
     
-  //   try {
-  //     // 计算5分钟后的时间
-  //     const fiveMinutesLater = new Date();
-  //     fiveMinutesLater.setMinutes(fiveMinutesLater.getMinutes() + 5);
+    try {
+      // Calculate time 5 minutes later
+      const fiveMinutesLater = new Date();
+      fiveMinutesLater.setMinutes(fiveMinutesLater.getMinutes() + 5);
       
-  //     const testAppointment = {
-  //       memberEmail: memberData.email,
-  //       memberName: memberData.name || 'Test Member',
-  //       trainerId: "T001",
-  //       trainerName: "Jiamu Li",
-  //       courseType: "General Fitness",
-  //       date: Timestamp.fromDate(fiveMinutesLater),
-  //       timeStart: "11:00",
-  //       timeEnd: "12:00",
-  //       duration: 60,
-  //       status: "scheduled" as const,
-  //       notes: "Standard fitness routine including warm-up, cardio, and strength training",
-  //       createdAt: Timestamp.now(),
-  //       updatedAt: Timestamp.now()
-  //     };
+      const testAppointment = {
+        memberEmail: memberData.email || '',
+        memberName: memberData.name || 'Test Member',
+        trainerId: "T001",
+        trainerName: "Jiamu Li",
+        courseType: "General Fitness",
+        date: Timestamp.fromDate(fiveMinutesLater),
+        timeStart: "11:00",
+        timeEnd: "12:00",
+        duration: 60,
+        status: "scheduled" as const,
+        notes: "Standard fitness routine including warm-up, cardio, and strength training",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
 
-  //     // Add appointment
-  //     const appointmentRef = await addDoc(collection(db, "appointments"), testAppointment);
+      // Add appointment
+      const appointmentRef = await addDoc(collection(db, "appointments"), testAppointment);
       
-  //     // 立即更新本地状态
-  //     const newAppointment: Appointment = {
-  //       id: appointmentRef.id,
-  //       ...testAppointment
-  //     };
-  //     setAppointments(prevAppointments => [...prevAppointments, newAppointment]);
+      // Update local state immediately
+      const newAppointment: Appointment = {
+        id: appointmentRef.id,
+        memberEmail: memberData.email || '',
+        memberName: memberData.name || 'Test Member',
+        trainerId: "T001",
+        trainerName: "Jiamu Li",
+        courseType: "General Fitness",
+        date: Timestamp.fromDate(fiveMinutesLater),
+        timeStart: "11:00",
+        timeEnd: "12:00",
+        duration: 60,
+        status: "scheduled" as const,
+        notes: "Standard fitness routine including warm-up, cardio, and strength training",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+      setAppointments(prevAppointments => [...prevAppointments, newAppointment]);
       
-  //     // Create notification for the new appointment
-  //     const notification = {
-  //       email: memberData.email,
-  //       title: "New Appointment Reminder",
-  //       description: `You have successfully scheduled a ${testAppointment.courseType} training session with ${testAppointment.trainerName} for ${fiveMinutesLater.toLocaleDateString()} at ${testAppointment.timeStart}`,
-  //       date: Timestamp.now(),
-  //       type: "appointment",
-  //       read: false,
-  //       appointmentId: appointmentRef.id,
-  //       trainerId: testAppointment.trainerId,
-  //       createdAt: Timestamp.now()
-  //     };
+      // Create notification for the new appointment
+      const notification = {
+        email: memberData.email,
+        title: "New Appointment Reminder",
+        description: `You have successfully scheduled a ${testAppointment.courseType} training session with ${testAppointment.trainerName} for ${fiveMinutesLater.toLocaleDateString()} at ${testAppointment.timeStart}`,
+        date: Timestamp.now(),
+        type: "appointment",
+        read: false,
+        appointmentId: appointmentRef.id,
+        trainerId: testAppointment.trainerId,
+        createdAt: Timestamp.now()
+      };
 
-  //     // 使用 Firestore 存储通知
-  //     await addDoc(collection(db, "notifications"), notification);
+      // Store notification in Firestore
+      await addDoc(collection(db, "notifications"), notification);
       
-  //     message.success("Test appointment created.");
-  //     // 强制刷新 Dashboard 页面
-  //     router.refresh();
-  //   } catch (error) {
-  //     console.error("Error creating test appointment:", error);
-  //     message.error("Failed to create test appointment.");
-  //     // 如果发生错误，重新获取数据
-  //     fetchAppointments();
-  //   }
-  // };
+      message.success("Test appointment created.");
+      // Force refresh Dashboard page
+      router.refresh();
+    } catch (error) {
+      console.error("Error creating test appointment:", error);
+      message.error("Failed to create test appointment.");
+      // If error occurs, fetch data again
+      fetchAppointments();
+    }
+  };
 
   const onCancelAppointment = async (record: Appointment) => {
     try {
-      // 1. 更新appointment状态
+      // 1. Update appointment status
       const appointmentRef = doc(db, "appointments", record.id);
       await updateDoc(appointmentRef, {
         status: "cancelled",
         updatedAt: Timestamp.now()
       });
       
-      // 2. 查找并更新对应的training record
+      // 2. Find and update corresponding training record
       const trainingRecordQuery = query(
         collection(db, "trainingRecords"),
         where("email", "==", record.memberEmail),
@@ -154,12 +168,12 @@ export default function AppointmentsPage() {
         });
       }
       
-      // 3. 立即更新本地状态
+      // 3. Update local state immediately
       setAppointments(prevAppointments => 
         prevAppointments.filter(appointment => appointment.id !== record.id)
       );
       
-      // 4. 创建取消通知
+      // 4. Create cancellation notification
       if (!memberData) {
         throw new Error('Member data is required');
       }
@@ -178,21 +192,21 @@ export default function AppointmentsPage() {
         createdAt: Timestamp.now()
       };
 
-      // 5. 存储通知
+      // 5. Store notification
       await addDoc(collection(db, "notifications"), notification);
       
       message.success("Appointment cancelled.");
-      // 强制刷新 Dashboard 页面
+      // Force refresh Dashboard page
       router.refresh();
     } catch (error) {
       console.error("Error canceling appointment:", error);
       message.error("Failed to cancel appointment.");
-      // 如果发生错误，重新获取数据
+      // If error occurs, fetch data again
       fetchAppointments();
     }
   };
 
-  // 添加自动检查和更新预约状态的函数
+  // Add function to automatically check and update appointment status
   const checkAndUpdateAppointments = async () => {
     if (!user || !memberData) return;
 
@@ -216,15 +230,15 @@ export default function AppointmentsPage() {
           const [hours, minutes] = appointmentEndTime.split(':').map(Number);
           appointmentDateTime.setHours(hours, minutes, 0, 0);
 
-          // 如果预约结束时间已过，且状态仍为 scheduled
+          // If appointment end time has passed and status is still scheduled
           if (appointmentDateTime < now) {
-            // 更新预约状态为已完成
+            // Update appointment status to completed
             await updateDoc(docSnapshot.ref, {
               status: 'completed',
               updatedAt: Timestamp.now()
             });
 
-            // 创建通知
+            // Create notification
             const notification = {
               email: appointment.memberEmail,
               title: "Training Session Completed",
@@ -239,7 +253,7 @@ export default function AppointmentsPage() {
 
             await addDoc(collection(db, "notifications"), notification);
 
-            // 更新本地状态
+            // Update local state
             setAppointments(prevAppointments => 
               prevAppointments.filter(apt => apt.id !== docSnapshot.id)
             );
@@ -251,14 +265,14 @@ export default function AppointmentsPage() {
     }
   };
 
-  // 添加定时检查
+  // Add timer check
   useEffect(() => {
     if (!user || !memberData) return;
 
-    // 立即执行一次检查
+    // Immediately execute once
     checkAndUpdateAppointments();
 
-    // 设置定时器，每分钟检查一次
+    // Set timer to check every minute
     const interval = setInterval(checkAndUpdateAppointments, 60000);
 
     return () => {

@@ -37,7 +37,7 @@ const FitnessMap: React.FC = () => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   useEffect(() => {
-    // 获取用户当前位置
+    // Get user's current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -127,7 +127,7 @@ const FitnessMap: React.FC = () => {
         >
           {map && (
             <>
-              {/* 用户位置标记 */}
+              {/* User location marker */}
               <Marker
                 position={userLocation}
                 icon={{
@@ -136,7 +136,7 @@ const FitnessMap: React.FC = () => {
                 }}
               />
 
-              {/* 健身中心标记 */}
+              {/* Fitness center markers */}
               {fitnessCenters.map((center) => (
                 <Marker
                   key={center.id}
@@ -145,7 +145,7 @@ const FitnessMap: React.FC = () => {
                 />
               ))}
 
-              {/* 信息窗口 */}
+              {/* Info window */}
               {selectedCenter && (
                 <InfoWindow
                   position={selectedCenter.position}

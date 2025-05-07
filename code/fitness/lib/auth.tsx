@@ -9,20 +9,20 @@ import {
   signOut as firebaseSignOut
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 interface MemberData {
   memberId: string;
-  email: string;
+  email: string | null;
   name: string;
-  role: 'member' | 'trainer' | 'admin';
-  status: 'active' | 'inactive';
-  birthday?: Date | null;
-  address?: string;
-  trainerId?: string;
-  createdAt: any;
-  updatedAt: any;
+  role: string;
+  status: string;
+  birthday: Date | null;
+  address: string;
+  trainerId: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 interface AuthContextType {
@@ -41,49 +41,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 獲取會員資料的函數
-  const fetchMemberData = async (userId: string, userEmail: string | null) => {
-    if (!userId || !userEmail) {
-      console.log('Missing userId or userEmail:', { userId, userEmail });
-      return null;
-    }
-
+  // Function to get member data
+  const getMemberData = async (user: User): Promise<MemberData> => {
     try {
-      // 1. 嘗試獲取現有會員資料
-      const memberDoc = await getDoc(doc(db, 'members', userId));
+      // 1. Try to get existing member data
+      const memberDoc = await getDoc(doc(db, 'members', user.uid));
       
       if (memberDoc.exists()) {
-        const data = memberDoc.data() as MemberData;
-        console.log('Found existing member data:', data);
-        setMemberData(data);
-        return data;
+        return memberDoc.data() as MemberData;
       }
       
-      // 2. 如果會員資料不存在，創建新的會員資料
-      console.log('Creating new member data for:', userEmail);
+      // 2. If member data doesn't exist, create new member data
       const newMemberData: MemberData = {
-        memberId: userId,
-        email: userEmail,
-        name: '未命名會員',
+        memberId: user.uid,
+        email: user.email,
+        name: 'Unnamed Member',
         role: 'member',
         status: 'active',
         birthday: null,
         address: '',
         trainerId: '',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
       };
-
-      // 3. 寫入新會員資料
-      await setDoc(doc(db, 'members', userId), newMemberData);
-      console.log('Successfully created new member data');
       
-      // 4. 設置狀態
-      setMemberData(newMemberData);
+      // 3. Write new member data
+      await setDoc(doc(db, 'members', user.uid), newMemberData);
+      
+      // 4. Set state
       return newMemberData;
     } catch (error) {
-      console.error('Error in fetchMemberData:', error);
-      return null;
+      console.error('Error getting member data:', error);
+      throw new Error('Unable to get member data');
     }
   };
 
@@ -101,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(user);
       
       if (user) {
-        const memberData = await fetchMemberData(user.uid, user.email);
+        const memberData = await getMemberData(user);
         if (!memberData) {
           console.error('Failed to fetch or create member data');
         }
@@ -118,47 +107,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
-      setLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('User signed in:', userCredential.user.email);
-      
-      const memberData = await fetchMemberData(userCredential.user.uid, userCredential.user.email);
-      if (!memberData) {
-        throw new Error('無法獲取會員資料');
-      }
+      const user = userCredential.user;
+      const memberData = await getMemberData(user);
+      setUser(user);
+      setMemberData(memberData);
     } catch (error: any) {
       console.error('Sign in error:', error);
-      throw new Error(error.message || '登入失敗');
-    } finally {
-      setLoading(false);
+      throw new Error(error.message || 'Sign in failed');
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string): Promise<void> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      const memberData: MemberData = {
-        memberId: user.uid,
-        email: email,
-        name: name,
-        role: 'member',
-        status: 'active',
-        birthday: null,
-        address: '',
-        trainerId: '',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      await setDoc(doc(db, 'members', user.uid), memberData);
-      console.log('Successfully created member data for:', email);
+      const memberData = await getMemberData(user);
+      setUser(user);
+      setMemberData(memberData);
     } catch (error: any) {
       console.error('Sign up error:', error);
-      throw new Error(error.message || '註冊失敗');
+      throw new Error(error.message || 'Sign up failed');
     }
   };
 
@@ -182,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext);
 
-// 自定義Hook用於確保用戶已登入
+// Custom hook to ensure user is logged in
 export const useRequireAuth = () => {
   const { user, memberData, loading } = useAuth();
   const router = useRouter();

@@ -67,7 +67,7 @@ const ReceiveMemberPage = () => {
     }
     
     try {
-      // 根据邮箱在trainer集合中查找对应的教练
+      // Find the corresponding trainer in the trainer collection based on email
       const trainersQuery = query(
         collection(db, 'trainer'),
         where('email', '==', memberData.email)
@@ -79,7 +79,7 @@ const ReceiveMemberPage = () => {
         return trainerData.trainerId || trainerSnapshot.docs[0].id;
       } else {
         console.error("No trainer found with email:", memberData.email);
-        // 如果找不到对应的trainer记录，使用memberId作为fallback
+        // If no corresponding trainer record is found, use memberId as fallback
         return memberData?.memberId || null;
       }
     } catch (error) {
@@ -102,7 +102,7 @@ const ReceiveMemberPage = () => {
       
       console.log("Fetching requests for trainer:", trainerIdQuery);
       
-      // 简化查询 - 直接获取分配给当前教练的请求
+      // Simplify query - directly get requests assigned to current trainer
       const allRequestsQuery = query(
         collection(db, 'requests'),
         where('trainerId', '==', trainerIdQuery)
@@ -110,12 +110,12 @@ const ReceiveMemberPage = () => {
       
       console.log("Executing simple query to fetch all trainer requests");
       
-      // 获取所有请求
+      // Get all requests
       const requestsSnapshot = await getDocs(allRequestsQuery);
       console.log(`Found ${requestsSnapshot.docs.length} total requests for trainer ${trainerIdQuery}`);
       
       if (requestsSnapshot.docs.length > 0) {
-        // 映射成Request对象，筛选pending状态和无状态的请求
+        // Map to Request objects, filter pending status and undefined status requests
         const requestsList = requestsSnapshot.docs
           .map(doc => {
             const data = doc.data();
@@ -143,7 +143,7 @@ const ReceiveMemberPage = () => {
       console.error('Error fetching requests:', error);
       message.error(`Failed to load requests: ${error.message || 'Unknown error'}`);
       
-      // 提供一些模拟数据以便用户能够使用界面
+      // Provide some demo data so users can use the interface
       const demoRequests: Request[] = [
         {
           id: 'demo1',
@@ -165,37 +165,37 @@ const ReceiveMemberPage = () => {
 
   const fetchAlternativeTrainers = async () => {
     try {
-      console.log("开始获取其他教练信息...");
+      console.log("Starting to fetch other trainer information...");
       
-      // 获取当前教练ID
+      // Get current trainer ID
       const currentTrainerId = await getTrainerId();
-      console.log("当前教练ID:", currentTrainerId);
+      console.log("Current trainer ID:", currentTrainerId);
       
       if (!currentTrainerId) {
-        console.error("未能获取当前教练ID");
+        console.error("Failed to get current trainer ID");
         setAlternativeTrainers([]);
         return;
       }
       
-      // 首先尝试从trainer集合获取其他教练
-      console.log("从trainer集合中查询所有教练...");
+      // First try to get other trainers from the trainer collection
+      console.log("Querying all trainers from trainer collection...");
       const trainersSnapshot = await getDocs(collection(db, 'trainer'));
-      console.log(`在trainer集合中找到 ${trainersSnapshot.docs.length} 个教练文档`);
+      console.log(`Found ${trainersSnapshot.docs.length} trainer documents in trainer collection`);
       
       if (trainersSnapshot.docs.length > 0) {
-        // 打印所有找到的教练数据以便调试
+        // Print all found trainer data for debugging
         trainersSnapshot.docs.forEach(doc => {
-          console.log(`教练文档 ${doc.id}:`, doc.data());
+          console.log(`Trainer document ${doc.id}:`, doc.data());
         });
         
         const trainersList = trainersSnapshot.docs
           .map(doc => {
             const data = doc.data();
-            // 确保trainerId字段存在
+            // Ensure trainerId field exists
             const trainerId = data.trainerId || doc.id;
             const name = data.name || 'Unnamed Trainer';
             
-            console.log(`处理教练: ID=${trainerId}, Name=${name}`);
+            console.log(`Processing trainer: ID=${trainerId}, Name=${name}`);
             
             return {
               id: doc.id,
@@ -205,15 +205,15 @@ const ReceiveMemberPage = () => {
             } as Trainer;
           })
           .filter(trainer => {
-            // 过滤掉当前教练
+            // Filter out current trainer
             const isCurrentTrainer = trainer.trainerId === currentTrainerId;
             if (isCurrentTrainer) {
-              console.log(`排除当前教练: ${trainer.name} (${trainer.trainerId})`);
+              console.log(`Excluding current trainer: ${trainer.name} (${trainer.trainerId})`);
             }
             return !isCurrentTrainer;
           });
         
-        console.log("过滤后的其他教练列表:", trainersList);
+        console.log("Filtered list of other trainers:", trainersList);
         
         if (trainersList.length > 0) {
           setAlternativeTrainers(trainersList);
@@ -223,8 +223,8 @@ const ReceiveMemberPage = () => {
         }
       }
       
-      // 如果trainer集合中没有找到其他教练，尝试从其他集合获取
-      console.log("尝试从members集合中查找角色为'trainer'的用户");
+      // If no other trainers found in trainer collection, try to get from other collections
+      console.log("Trying to find users with role 'trainer' from members collection");
       const trainersFromMembersQuery = query(
         collection(db, 'members'),
         where('role', '==', 'trainer'),
@@ -232,7 +232,7 @@ const ReceiveMemberPage = () => {
       );
       
       const trainersMembersSnapshot = await getDocs(trainersFromMembersQuery);
-      console.log(`在members集合中找到 ${trainersMembersSnapshot.docs.length} 个trainer角色的用户`);
+      console.log(`Found ${trainersMembersSnapshot.docs.length} users with trainer role in members collection`);
       
       if (trainersMembersSnapshot.docs.length > 0) {
         const trainersFromMembers = trainersMembersSnapshot.docs
@@ -247,7 +247,7 @@ const ReceiveMemberPage = () => {
           })
           .filter(trainer => trainer.trainerId !== currentTrainerId);
         
-        console.log("从members集合找到的其他教练:", trainersFromMembers);
+        console.log("Other trainers found from members collection:", trainersFromMembers);
         
         if (trainersFromMembers.length > 0) {
           setAlternativeTrainers(trainersFromMembers);
@@ -255,8 +255,8 @@ const ReceiveMemberPage = () => {
         }
       }
       
-      // 如果仍然没有找到，手动添加Tom作为替代教练
-      console.log("未找到其他教练，添加默认教练 'Tom (T002)'");
+      // If still no other trainers found, manually add Tom as alternative trainer
+      console.log("No other trainers found, adding default trainer 'Tom (T002)'");
       const defaultTrainer: Trainer = {
         id: 'default-tom',
         trainerId: 'T002',
@@ -266,9 +266,9 @@ const ReceiveMemberPage = () => {
       
       setAlternativeTrainers([defaultTrainer]);
     } catch (error) {
-      console.error('获取其他教练时出错:', error);
+      console.error('Error fetching other trainers:', error);
       
-      // 出错时，至少提供一个默认教练
+      // Provide a default trainer in case of error
       console.log("error 'Tom (T002)'");
       setAlternativeTrainers([{
         id: 'default-tom',
@@ -298,7 +298,7 @@ const ReceiveMemberPage = () => {
     try {
       console.log("Accepting request:", request);
       
-      // 确保请求有ID
+      // Ensure request has ID
       if (!request.id) {
         message.error('Request ID is missing');
         return;
@@ -310,9 +310,9 @@ const ReceiveMemberPage = () => {
         return;
       }
       
-      // 直接更新方法
+      // Direct update method
       try {
-        // 1. 更新请求状态为 accepted
+        // 1. Update request status to accepted
         console.log("Updating request status to accepted");
         const requestRef = doc(db, 'requests', request.id);
         await updateDoc(requestRef, {
@@ -322,7 +322,7 @@ const ReceiveMemberPage = () => {
         
         console.log("Request status updated to 'accepted'");
         
-        // 2. 为会员创建通知
+        // 2. Create notification for member
         console.log("Creating notification for member");
         await addDoc(collection(db, 'notifications'), {
           email: request.memberName,
@@ -334,13 +334,13 @@ const ReceiveMemberPage = () => {
         
         console.log("Notification created successfully");
         
-        // 3. 更新UI - 从列表中移除已接受的请求
+        // 3. Update UI - Remove accepted request from list
         setRequests(prev => prev.filter(r => r.id !== request.id));
         message.success('Request accepted successfully');
       } catch (error: any) {
         console.error("Error updating database:", error);
         
-        // 如果数据库更新失败，至少更新UI，以便用户可以继续工作
+        // If database update fails, at least update UI, so users can continue working
         setRequests(prev => prev.filter(r => r.id !== request.id));
         message.success('Request accepted');
       }
@@ -352,13 +352,13 @@ const ReceiveMemberPage = () => {
 
   const showRejectionModal = (request: Request) => {
     setCurrentRequest(request);
-    // 在显示模态窗口前重新获取可选教练列表
+    // Before showing modal, refresh list of available trainers
     fetchAlternativeTrainers().then(() => {
-      console.log("模态窗口打开，已刷新教练列表");
+      console.log("Modal opened, trainers list refreshed");
       setRejectionModalVisible(true);
     }).catch(error => {
-      console.error("获取教练列表失败:", error);
-      // 即使获取失败也显示模态窗口，会使用之前的列表或默认教练
+      console.error("Error getting trainers list:", error);
+      // Even if getting fails, show modal, will use previous list or default trainer
       setRejectionModalVisible(true);
     });
   };
@@ -372,15 +372,15 @@ const ReceiveMemberPage = () => {
     try {
       console.log("Redirecting request to trainer:", selectedTrainer);
       
-      // 获取选中的教练详情
+      // Get selected trainer details
       const selectedTrainerData = alternativeTrainers.find(t => t.trainerId === selectedTrainer);
       if (!selectedTrainerData) {
         throw new Error('Selected trainer not found');
       }
 
-      // 直接更新数据库
+      // Direct update to database
       try {
-        // 1. 更新原始请求状态为 rejected
+        // 1. Update original request status to rejected
         console.log("Updating original request as rejected");
         const requestRef = doc(db, 'requests', currentRequest.id);
         await updateDoc(requestRef, {
@@ -392,7 +392,7 @@ const ReceiveMemberPage = () => {
         
         console.log("Original request updated as rejected");
         
-        // 2. 为会员创建通知
+        // 2. Create notification for member
         console.log("Creating notification for member");
         const notificationData = {
           email: currentRequest.memberName,
@@ -405,7 +405,7 @@ const ReceiveMemberPage = () => {
         await addDoc(collection(db, 'notifications'), notificationData);
         console.log("Rejection notification created successfully");
         
-        // 3. 更新UI
+        // 3. Update UI
         setRequests(prev => prev.filter(r => r.id !== currentRequest.id));
         setRejectionModalVisible(false);
         setCurrentRequest(null);
@@ -414,7 +414,7 @@ const ReceiveMemberPage = () => {
       } catch (error: any) {
         console.error("Error updating database:", error);
         
-        // 如果数据库更新失败，至少更新UI
+        // If database update fails, at least update UI
         setRequests(prev => prev.filter(r => r.id !== currentRequest.id));
         setRejectionModalVisible(false);
         setCurrentRequest(null);
