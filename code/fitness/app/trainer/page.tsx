@@ -104,6 +104,7 @@ const TrainerDashboard = () => {
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
         // Fetch cancelled sessions
+<<<<<<< HEAD
         try {
           const cancelledQuery = query(
             collection(db, 'appointments'),
@@ -134,6 +135,38 @@ const TrainerDashboard = () => {
               } catch (error) {
                 console.error('Error showing notification:', error);
               }
+=======
+        const cancelledQuery = query(
+          collection(db, 'appointments'),
+          where('trainerId', '==', trainerIdQuery),
+          where('status', '==', 'cancelled'),
+          orderBy('date', 'desc'),
+          limit(10)
+        );
+        type CancelledSession = {
+          id: string;
+          memberEmail?: string;
+          timeStart?: string;
+          timeEnd?: string;
+          date?: Timestamp;
+          [key: string]: any; // 若不确定还包含哪些字段
+        };
+        const cancelledSnapshot = await getDocs(cancelledQuery);
+        const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCancelledSessions(cancelledData);
+        
+        // Show notification for cancelled sessions if there are any
+        if (cancelledData.length > 0) {
+          cancelledData.forEach(session => {
+            notification.warning({
+              message: 'Session Cancelled',
+              description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
+              icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+              duration: 5
+>>>>>>> 94e635e13f399c101626d6589341a26d75b7ce23
             });
           }
         } catch (error) {
