@@ -18,7 +18,7 @@ interface CancelledSession {
   memberEmail?: string;
   timeStart?: string;
   timeEnd?: string;
-  date?: any;
+  date?: Timestamp;
   trainerName?: string;
   status?: string;
 }
@@ -48,7 +48,7 @@ const TrainerDashboard = () => {
       
       setLoading(true);
       try {
-        // 直接从trainer集合中获取trainerId
+        // Get trainerId directly from the trainer collection
         let trainerIdQuery: string;
         
         const trainersQuery = query(
@@ -61,7 +61,7 @@ const TrainerDashboard = () => {
           const trainerData = trainerSnapshot.docs[0].data();
           trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
         } else {
-          // 如果没有找到，则使用memberId作为fallback
+          // If not found, use memberId as fallback
           console.warn("No trainer found, using memberId as fallback");
           trainerIdQuery = memberData.memberId || 'T001';
         }
@@ -103,74 +103,62 @@ const TrainerDashboard = () => {
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
-        // Fetch cancelled sessions
-<<<<<<< HEAD
+        // Get cancelled appointments - directly from appointments database
         try {
+          console.log("Getting cancelled appointments:", trainerIdQuery);
+          // Simplify query, remove orderBy to avoid index issues
           const cancelledQuery = query(
             collection(db, 'appointments'),
             where('trainerId', '==', trainerIdQuery),
-            where('status', '==', 'cancelled'),
-            orderBy('date', 'desc'),
-            limit(10)
+            where('status', '==', 'cancelled')
+            // Remove orderBy to avoid needing to create compound index
           );
           
           const cancelledSnapshot = await getDocs(cancelledQuery);
-          const cancelledData = cancelledSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as CancelledSession[];
+          console.log(`Found ${cancelledSnapshot.docs.length} cancelled appointments`);
+          
+          const cancelledData = cancelledSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                memberEmail: data.memberEmail || 'Unknown',
+                timeStart: data.timeStart || 'N/A',
+                timeEnd: data.timeEnd || 'N/A',
+                date: data.date,
+                trainerName: data.trainerName || 'Unknown',
+                status: 'cancelled'
+              };
+            })
+            // Sort manually in JavaScript
+            .sort((a, b) => {
+              if (a.date && b.date) {
+                return b.date.seconds - a.date.seconds;
+              }
+              return 0;
+            })
+            // Limit to 10 records
+            .slice(0, 10);
           
           setCancelledSessions(cancelledData);
           
-          // Show notification for cancelled sessions if there are any
+          // Show notifications
           if (cancelledData.length > 0) {
             cancelledData.forEach(session => {
               try {
                 notification.warning({
                   message: 'Session Cancelled',
-                  description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
+                  description: `${session.trainerName} has cancelled session from ${session.timeStart} to ${session.timeEnd}`,
                   icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
                   duration: 5
                 });
               } catch (error) {
-                console.error('Error showing notification:', error);
+                console.error('Error displaying notification:', error);
               }
-=======
-        const cancelledQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
-          where('status', '==', 'cancelled'),
-          orderBy('date', 'desc'),
-          limit(10)
-        );
-        type CancelledSession = {
-          id: string;
-          memberEmail?: string;
-          timeStart?: string;
-          timeEnd?: string;
-          date?: Timestamp;
-          [key: string]: any; // 若不确定还包含哪些字段
-        };
-        const cancelledSnapshot = await getDocs(cancelledQuery);
-        const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setCancelledSessions(cancelledData);
-        
-        // Show notification for cancelled sessions if there are any
-        if (cancelledData.length > 0) {
-          cancelledData.forEach(session => {
-            notification.warning({
-              message: 'Session Cancelled',
-              description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
-              icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-              duration: 5
->>>>>>> 94e635e13f399c101626d6589341a26d75b7ce23
             });
           }
         } catch (error) {
-          console.error('Error fetching cancelled sessions:', error);
+          console.error('Error getting cancelled appointments:', error);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -244,14 +232,14 @@ const TrainerDashboard = () => {
               <List
                 itemLayout="horizontal"
                 dataSource={cancelledSessions}
-                renderItem={(item: CancelledSession) => (
+                renderItem={(item) => (
                   <List.Item>
                     <List.Item.Meta
                       avatar={<CloseCircleOutlined style={{ color: 'red', fontSize: '24px' }} />}
-                      title={`Session with ${item.memberEmail || 'a member'}`}
+                      title={`Session with ${item.trainerName}`}
                       description={item.date && item.date.toDate ? 
-                        `${new Date(item.date.toDate()).toLocaleDateString()} from ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}` :
-                        `From ${item.timeStart || 'N/A'} to ${item.timeEnd || 'N/A'}`
+                        `${new Date(item.date.toDate()).toLocaleDateString()} from ${item.timeStart} to ${item.timeEnd}` :
+                        `From ${item.timeStart} to ${item.timeEnd}`
                       }
                     />
                   </List.Item>

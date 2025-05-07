@@ -55,10 +55,10 @@ const MemberHistoryPage = () => {
     if (!memberData) return;
     
     try {
-      // 优先使用memberData中的trainerId，如果没有则尝试从trainer集合中查询
+      // Prioritize using trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = memberData.trainerId;
 
-      // 如果memberData中没有trainerId，尝试从trainer集合中查询
+      // If there's no trainerId in memberData, try to query from trainer collection
       if (!trainerIdQuery) {
         const trainersQuery = query(
           collection(db, 'trainer'),
@@ -70,7 +70,7 @@ const MemberHistoryPage = () => {
           const trainerData = trainerSnapshot.docs[0].data();
           trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
         } else {
-          // 如果仍然没有找到，则使用memberId作为fallback
+          // If still not found, use memberId as fallback
           console.warn("No trainer found, using memberId as fallback");
           trainerIdQuery = memberData.memberId;
         }
@@ -235,10 +235,10 @@ const MemberHistoryPage = () => {
     
     setLoading(true);
     try {
-      // 优先使用memberData中的trainerId，如果没有则尝试从trainer集合中查询
+      // Prioritize using trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = memberData.trainerId;
 
-      // 如果memberData中没有trainerId，尝试从trainer集合中查询
+      // If there's no trainerId in memberData, try to query from trainer collection
       if (!trainerIdQuery) {
         const trainersQuery = query(
           collection(db, 'trainer'),
@@ -250,7 +250,7 @@ const MemberHistoryPage = () => {
           const trainerData = trainerSnapshot.docs[0].data();
           trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
         } else {
-          // 如果仍然没有找到，则使用memberId作为fallback
+          // If still not found, use memberId as fallback
           console.warn("No trainer found, using memberId as fallback");
           trainerIdQuery = memberData.memberId;
         }
@@ -258,17 +258,18 @@ const MemberHistoryPage = () => {
       
       console.log("Fetching training records for trainer:", trainerIdQuery, "member:", memberId);
       
-      // First try looking in the appointments collection as this may be what's being used
-      console.log("Trying to fetch from appointments collection first");
+      // Create query conditions - only get data from appointments collection
       let appointmentsQuery;
       
       if (memberId) {
+        // If a member is specified, filter by member email
         appointmentsQuery = query(
           collection(db, 'appointments'),
           where('trainerId', '==', trainerIdQuery),
           where('memberEmail', '==', memberId)
         );
       } else {
+        // Otherwise get all appointments for this trainer
         appointmentsQuery = query(
           collection(db, 'appointments'),
           where('trainerId', '==', trainerIdQuery)
@@ -278,23 +279,30 @@ const MemberHistoryPage = () => {
       const appointmentsSnapshot = await getDocs(appointmentsQuery);
       console.log(`Found ${appointmentsSnapshot.docs.length} appointments`);
       
-      // Convert appointments to training records format
+      // Convert appointments to training record format
       let records: TrainingRecord[] = appointmentsSnapshot.docs.map(doc => {
         const data = doc.data();
         const appointmentDate = data.date?.toDate() || new Date();
-        let status = data.status || 'pending';
+        let status: 'completed' | 'cancelled' | 'pending' = 'pending';
         
-        // 如果日期已过且状态仍为scheduled，将其视为completed
-        if (status === 'scheduled' && appointmentDate < new Date()) {
+        // Determine record status based on appointment status and date
+        if (data.status === 'cancelled') {
+          status = 'cancelled';
+        } else if (data.status === 'scheduled') {
+          // If date has passed and status is still scheduled, consider it completed
+          if (appointmentDate < new Date()) {
+            status = 'completed';
+          } else {
+            status = 'pending';
+          }
+        } else if (data.status === 'completed') {
           status = 'completed';
-        } else if (status === 'scheduled') {
-          status = 'pending';
         }
         
         return {
           id: doc.id,
           memberEmail: data.memberEmail || '',
-          memberName: data.trainerName || 'Unknown Trainer',
+          memberName: data.trainerName || 'Unknown Trainer', // Use trainerName as display name
           trainerId: data.trainerId || trainerIdQuery,
           trainerName: data.trainerName || 'Unknown Trainer',
           courseType: data.courseType || 'General Training',
@@ -308,48 +316,7 @@ const MemberHistoryPage = () => {
         } as TrainingRecord;
       });
       
-      // If no appointments found, try training records
-      if (records.length === 0) {
-        console.log("No appointments found, trying trainingRecords collection");
-        let trainingQuery;
-        
-        if (memberId) {
-          trainingQuery = query(
-            collection(db, 'trainingRecords'),
-            where('trainerId', '==', trainerIdQuery),
-            where('memberEmail', '==', memberId)
-          );
-        } else {
-          trainingQuery = query(
-            collection(db, 'trainingRecords'),
-            where('trainerId', '==', trainerIdQuery)
-          );
-        }
-        
-        const querySnapshot = await getDocs(trainingQuery);
-        console.log(`Found ${querySnapshot.docs.length} training records`);
-        
-        records = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            memberEmail: data.memberEmail || '',
-            memberName: data.trainerName || 'Unknown Trainer',
-            trainerId: data.trainerId || trainerIdQuery,
-            trainerName: data.trainerName || 'Unknown Trainer',
-            courseType: data.courseType || 'General Training',
-            sessionDate: data.sessionDate || Timestamp.now(),
-            timeStart: data.timeStart || '00:00',
-            timeEnd: data.timeEnd || '00:00',
-            duration: data.duration || 0,
-            status: data.status || 'pending',
-            notes: data.notes || '',
-            createdAt: data.createdAt || Timestamp.now()
-          } as TrainingRecord;
-        });
-      }
-      
-      // Filter by date if provided
+      // Filter by date
       if (dateStart && dateEnd) {
         console.log("Filtering by date range:", dateStart, dateEnd);
         const startTimestamp = Timestamp.fromDate(dateStart.toDate());
@@ -360,7 +327,7 @@ const MemberHistoryPage = () => {
             const recordDate = record.sessionDate;
             if (!recordDate) return false;
             
-            // Handle comparison differently based on the type
+            // Handle different types of recordDate
             if (recordDate.toDate) {
               return recordDate >= startTimestamp && recordDate <= endTimestamp;
             } else if (recordDate instanceof Date) {
@@ -378,7 +345,10 @@ const MemberHistoryPage = () => {
       // Sort by date (newest first)
       records.sort((a, b) => {
         try {
-          return b.sessionDate.seconds - a.sessionDate.seconds;
+          if (a.sessionDate && b.sessionDate) {
+            return b.sessionDate.seconds - a.sessionDate.seconds;
+          }
+          return 0;
         } catch (error) {
           return 0;
         }
@@ -391,7 +361,7 @@ const MemberHistoryPage = () => {
     } catch (error) {
       console.error('Error fetching training records:', error);
       message.error('Failed to load training records');
-      // Set empty arrays to prevent UI errors
+      // Set empty array to prevent UI errors
       setTrainingRecords([]);
       setCourseProgress({});
     } finally {
@@ -401,10 +371,11 @@ const MemberHistoryPage = () => {
 
   const calculateCourseProgress = (records: TrainingRecord[]) => {
     try {
-      // Filter out records with missing courseType
+      // Filter valid records (containing courseType field)
       const validRecords = records.filter(record => record.courseType);
       console.log(`Calculating progress for ${validRecords.length} valid records`);
       
+      // Group by course type and only calculate completed courses
       const courseGroups = validRecords.reduce<Record<string, TrainingRecord[]>>((acc, record) => {
         try {
           const { courseType } = record;
@@ -426,6 +397,7 @@ const MemberHistoryPage = () => {
       
       const progress: Record<string, CourseProgress> = {};
       for (const [courseType, courseRecords] of Object.entries(courseGroups)) {
+        // Number of sessions required to complete each course type (can be adjusted)
         const totalSessionsRequired = 10;
         const completedSessions = courseRecords.length;
         const progressPercentage = Math.min(Math.round((completedSessions / totalSessionsRequired) * 100), 100);

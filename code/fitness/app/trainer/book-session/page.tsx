@@ -182,7 +182,7 @@ const BookSessionPage = () => {
     try {
       let trainerIdQuery: string;
       
-      // 直接从trainer集合中获取trainerId
+      // Get trainerId directly from trainer collection
       const trainersQuery = query(
         collection(db, 'trainer'),
         where('email', '==', memberData.email)
@@ -193,22 +193,25 @@ const BookSessionPage = () => {
         const trainerData = trainerSnapshot.docs[0].data();
         trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
       } else {
-        // 如果没有找到，使用memberId作为fallback
+        // If not found, use memberId as fallback
         console.warn("No trainer found for appointments, using memberId as fallback");
         trainerIdQuery = memberData.memberId || 'T001';
       }
       
-      const appointmentsQuery = query(
+      // Get all scheduled and completed appointments
+      const scheduledQuery = query(
         collection(db, 'appointments'),
-        where('trainerId', '==', trainerIdQuery)
+        where('trainerId', '==', trainerIdQuery),
+        where('status', 'in', ['scheduled', 'completed'])
       );
       
-      const querySnapshot = await getDocs(appointmentsQuery);
+      const querySnapshot = await getDocs(scheduledQuery);
       const appointmentsList = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Appointment[];
       
+      console.log(`Found ${appointmentsList.length} scheduled/completed appointments`);
       setAppointments(appointmentsList);
     } catch (error) {
       console.error('Error fetching appointments:', error);
@@ -360,31 +363,6 @@ const BookSessionPage = () => {
       // Update local state
       setAppointments([...appointments, { ...appointmentData, id: appointmentRef.id } as Appointment]);
       
-      // Try to create training record
-      try {
-        const trainingRecord = {
-          status: 'scheduled',
-          courseType: values.courseType || 'General Fitness',
-          trainerId: trainerId,
-          memberId: selectedMember.id || '',
-          memberName: trainerName,
-          memberEmail: values.memberEmail || '',
-          duration: durationMinutes || 60,
-          date: Timestamp.fromDate(selectedDate.toDate()),
-          timeStart,
-          timeEnd,
-          notes: values.notes || '',
-          appointmentId: appointmentRef.id,
-          createdAt: Timestamp.now()
-        };
-        
-        await addDoc(collection(db, 'TrainingRecords'), trainingRecord);
-        console.log("Training record created for appointment:", appointmentRef.id);
-      } catch (error) {
-        console.error('Error creating training record:', error);
-        // Continue even if training record creation fails
-      }
-      
       // Try to create notification
       try {
         const notification = {
@@ -437,7 +415,8 @@ const BookSessionPage = () => {
       return (
         appDate.getDate() === date.date() &&
         appDate.getMonth() === date.month() &&
-        appDate.getFullYear() === date.year()
+        appDate.getFullYear() === date.year() &&
+        (appointment.status === 'scheduled' || appointment.status === 'completed')
       );
     });
     
@@ -458,7 +437,8 @@ const BookSessionPage = () => {
       return (
         appDate.getDate() === date.date() &&
         appDate.getMonth() === date.month() &&
-        appDate.getFullYear() === date.year()
+        appDate.getFullYear() === date.year() &&
+        (appointment.status === 'scheduled' || appointment.status === 'completed')
       );
     });
     
