@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Progress, message, Spin, Tag, Typography, Select, DatePicker } from 'antd';
 import { ArrowLeftOutlined, HistoryOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, Timestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, getDoc, doc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
@@ -19,13 +19,12 @@ interface TrainingRecord {
   trainerId: string;
   trainerName: string;
   courseType: string;
-  sessionDate: any;
+  date: Date;
   timeStart: string;
   timeEnd: string;
   duration: number;
-  status: 'completed' | 'cancelled' | 'pending';
+  status: string;
   notes: string;
-  createdAt: any;
 }
 
 interface Member {
@@ -51,351 +50,168 @@ const MemberHistoryPage = () => {
   const { memberData } = useAuth();
   const router = useRouter();
 
+  const getTrainerId = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    // Prioritize trainerId from memberData, if not available try to query from trainer collection
+    if (memberData.trainerId) {
+      console.log("Using trainerId from memberData:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    // If no trainerId in memberData, try to query from trainer collection
+    try {
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If still not found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
   const fetchMembers = async () => {
     if (!memberData) return;
     
     try {
-      // 优先使用memberData中的trainerId，如果没有则尝试从trainer集合中查询
-      let trainerIdQuery = memberData.trainerId;
+      // Prioritize trainerId from memberData, if not available try to query from trainer collection
+      let trainerIdQuery = await getTrainerId();
 
-      // 如果memberData中没有trainerId，尝试从trainer集合中查询
-      if (!trainerIdQuery) {
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // 如果仍然没有找到，则使用memberId作为fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId;
-        }
-      }
-      
       console.log("Current trainer ID:", trainerIdQuery);
       
       // Store all members in this map
-      const memberMap = new Map<string, Member>();
+      const membersMap = new Map<string, Member>();
       
-      // Method 1: Get members directly from members collection who have this trainer assigned
-      console.log("Trying to get members with trainerId field");
-      const membersQuery = query(
-        collection(db, 'members'),
+      // Get all appointments for this trainer
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
         where('trainerId', '==', trainerIdQuery)
       );
       
-      const membersSnapshot = await getDocs(membersQuery);
-      console.log(`Found ${membersSnapshot.docs.length} members with trainerId=${trainerIdQuery}`);
+      const appointmentsSnapshot = await getDocs(appointmentsQuery);
+      console.log(`Found ${appointmentsSnapshot.docs.length} appointments`);
       
-      // Add members to the map
-      membersSnapshot.docs.forEach(doc => {
-        const memberData = doc.data();
-        const memberId = doc.id;
-        
-        memberMap.set(memberId, {
-          id: memberId,
-          email: memberData.email || "Unknown",
-          name: memberData.name || memberData.email || "Unknown Member"
-        });
+      // Get unique member emails from appointments
+      const memberEmails = new Set<string>();
+      appointmentsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.memberEmail) {
+          memberEmails.add(data.memberEmail);
+        }
       });
       
-      // Method 2: Check trainer document for trainees field
-      try {
-        console.log("Checking trainer document for trainees field");
-        // Query trainers collection for the specific trainer
-        const trainerQuery = query(
-          collection(db, 'trainer'),
-          where('trainerId', '==', trainerIdQuery)
-        );
-        
-        const trainerSnapshot = await getDocs(trainerQuery);
-        
-        for (const trainerDoc of trainerSnapshot.docs) {
-          const trainerData = trainerDoc.data();
-          console.log("Trainer data:", trainerData);
-          
-          // Check if trainees field exists and is an array or object
-          if (trainerData.trainees) {
-            console.log("Found trainees in trainer document:", trainerData.trainees);
-            
-            // Handle trainees as array
-            if (Array.isArray(trainerData.trainees)) {
-              for (const traineeId of trainerData.trainees) {
-                if (typeof traineeId === 'string') {
-                  // Fetch member data for this trainee
-                  try {
-                    const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                    if (memberDoc.exists()) {
-                      const memberData = memberDoc.data();
-                      memberMap.set(traineeId, {
-                        id: traineeId,
-                        email: memberData.email || "Unknown",
-                        name: memberData.name || memberData.email || "Unknown Member"
-                      });
-                    }
-                  } catch (err) {
-                    console.error("Error fetching trainee details:", err);
-                  }
-                }
-              }
-            } 
-            // Handle trainees as object with key-value pairs
-            else if (typeof trainerData.trainees === 'object') {
-              for (const [traineeId, traineeValue] of Object.entries(trainerData.trainees)) {
-                try {
-                  const memberDoc = await getDoc(doc(db, 'members', traineeId));
-                  if (memberDoc.exists()) {
-                    const memberData = memberDoc.data();
-                    memberMap.set(traineeId, {
-                      id: traineeId,
-                      email: memberData.email || "Unknown",
-                      name: memberData.name || memberData.email || "Unknown Member"
-                    });
-                  }
-                } catch (err) {
-                  console.error("Error fetching trainee details:", err);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking trainer document:", error);
-      }
+      console.log(`Found ${memberEmails.size} unique member emails`);
       
-      // Method 3: Get members from accepted requests
-      if (memberMap.size === 0) {
-        console.log("Trying to get members from accepted requests");
-        const requestsQuery = query(
-          collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
-          where('status', '==', 'accepted')
-        );
-        
-        const querySnapshot = await getDocs(requestsQuery);
-        console.log(`Found ${querySnapshot.docs.length} accepted requests`);
-        
-        querySnapshot.docs.forEach(doc => {
-          const request = doc.data();
-          const memberId = request.memberId;
-          
-          if (!memberMap.has(memberId)) {
-            memberMap.set(memberId, {
-              id: memberId,
-              email: request.memberName,
-              name: request.memberName
-            });
-          }
-        });
-      }
-      
-      // Method 4: If still no members found, fetch all active members as fallback
-      if (memberMap.size === 0) {
-        console.log("Trying to get all active members as fallback");
-        const allMembersQuery = query(
+      // Get member details for each email
+      for (const email of memberEmails) {
+        const memberQuery = query(
           collection(db, 'members'),
-          where('role', '==', 'member'),
-          where('status', '==', 'active')
+          where('email', '==', email)
         );
         
-        const allMembersSnapshot = await getDocs(allMembersQuery);
-        console.log(`Found ${allMembersSnapshot.docs.length} active members`);
-        
-        allMembersSnapshot.docs.forEach(doc => {
-          const memberData = doc.data();
-          const memberId = doc.id;
-          
-          memberMap.set(memberId, {
-            id: memberId,
-            email: memberData.email || "Unknown",
-            name: memberData.name || memberData.email || "Unknown Member"
+        const memberSnapshot = await getDocs(memberQuery);
+        if (!memberSnapshot.empty) {
+          const memberDoc = memberSnapshot.docs[0];
+          const memberData = memberDoc.data() as Member;
+          membersMap.set(email, {
+            ...memberData,
+            id: memberDoc.id
           });
-        });
+        }
       }
       
-      const membersList = Array.from(memberMap.values());
-      console.log("Final members list:", membersList);
-      setMembers(membersList);
-      
-      if (membersList.length === 0) {
-        message.warning('No members found for this trainer. Please accept member requests first.');
-      }
+      console.log(`Successfully loaded ${membersMap.size} member details`);
+      setMembers(Array.from(membersMap.values()));
     } catch (error) {
       console.error('Error fetching members:', error);
       message.error('Failed to load members');
     }
   };
 
-  const fetchTrainingRecords = async (memberId?: string, dateStart?: any, dateEnd?: any) => {
+  const fetchTrainingRecords = async (memberId: string) => {
     if (!memberData) return;
     
-    setLoading(true);
     try {
-      // 优先使用memberData中的trainerId，如果没有则尝试从trainer集合中查询
-      let trainerIdQuery = memberData.trainerId;
+      // Prioritize trainerId from memberData, if not available try to query from trainer collection
+      let trainerIdQuery = await getTrainerId();
 
-      // 如果memberData中没有trainerId，尝试从trainer集合中查询
-      if (!trainerIdQuery) {
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // 如果仍然没有找到，则使用memberId作为fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId;
-        }
-      }
-      
       console.log("Fetching training records for trainer:", trainerIdQuery, "member:", memberId);
       
-      // First try looking in the appointments collection as this may be what's being used
-      console.log("Trying to fetch from appointments collection first");
-      let appointmentsQuery;
-      
-      if (memberId) {
-        appointmentsQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
-          where('memberEmail', '==', memberId)
-        );
-      } else {
-        appointmentsQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery)
-        );
+      // Get member's email first
+      const memberDoc = await getDoc(doc(db, 'members', memberId));
+      if (!memberDoc.exists()) {
+        throw new Error('Member not found');
       }
       
-      const appointmentsSnapshot = await getDocs(appointmentsQuery);
-      console.log(`Found ${appointmentsSnapshot.docs.length} appointments`);
+      const memberEmail = memberDoc.data().email;
       
-      // Convert appointments to training records format
-      let records: TrainingRecord[] = appointmentsSnapshot.docs.map(doc => {
+      // Get all appointments for this member with this trainer
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
+        where('trainerId', '==', trainerIdQuery),
+        where('memberEmail', '==', memberEmail),
+        orderBy('date', 'desc')
+      );
+      
+      const appointmentsSnapshot = await getDocs(appointmentsQuery);
+      console.log(`Found ${appointmentsSnapshot.docs.length} appointments for member ${memberId}`);
+      
+      const records = appointmentsSnapshot.docs.map(doc => {
         const data = doc.data();
-        const appointmentDate = data.date?.toDate() || new Date();
+        const appointmentDate = data.date.toDate();
         let status = data.status || 'pending';
         
-        // 如果日期已过且状态仍为scheduled，将其视为completed
-        if (status === 'scheduled' && appointmentDate < new Date()) {
+        // If date has passed and status is still scheduled, treat it as completed
+        if (appointmentDate < new Date() && status === 'scheduled') {
           status = 'completed';
         } else if (status === 'scheduled') {
-          status = 'pending';
+          const now = new Date();
+          const appointmentTime = new Date(appointmentDate);
+          appointmentTime.setHours(
+            parseInt(data.timeEnd.split(':')[0]),
+            parseInt(data.timeEnd.split(':')[1])
+          );
+          if (now > appointmentTime) {
+            status = 'completed';
+          }
         }
         
         return {
           id: doc.id,
-          memberEmail: data.memberEmail || '',
-          memberName: data.trainerName || 'Unknown Trainer',
-          trainerId: data.trainerId || trainerIdQuery,
-          trainerName: data.trainerName || 'Unknown Trainer',
-          courseType: data.courseType || 'General Training',
-          sessionDate: data.date || Timestamp.now(),
+          memberEmail: memberEmail,
+          memberName: memberDoc.data().name || 'Unknown Member',
+          trainerId: trainerIdQuery,
+          trainerName: memberData?.name || 'Current Trainer',
+          date: appointmentDate,
           timeStart: data.timeStart || '00:00',
           timeEnd: data.timeEnd || '00:00',
           duration: data.duration || 0,
           status: status,
-          notes: data.notes || '',
-          createdAt: data.createdAt || Timestamp.now()
+          courseType: data.courseType || 'General Training',
+          notes: data.notes || ''
         } as TrainingRecord;
       });
       
-      // If no appointments found, try training records
-      if (records.length === 0) {
-        console.log("No appointments found, trying trainingRecords collection");
-        let trainingQuery;
-        
-        if (memberId) {
-          trainingQuery = query(
-            collection(db, 'trainingRecords'),
-            where('trainerId', '==', trainerIdQuery),
-            where('memberEmail', '==', memberId)
-          );
-        } else {
-          trainingQuery = query(
-            collection(db, 'trainingRecords'),
-            where('trainerId', '==', trainerIdQuery)
-          );
-        }
-        
-        const querySnapshot = await getDocs(trainingQuery);
-        console.log(`Found ${querySnapshot.docs.length} training records`);
-        
-        records = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            memberEmail: data.memberEmail || '',
-            memberName: data.trainerName || 'Unknown Trainer',
-            trainerId: data.trainerId || trainerIdQuery,
-            trainerName: data.trainerName || 'Unknown Trainer',
-            courseType: data.courseType || 'General Training',
-            sessionDate: data.sessionDate || Timestamp.now(),
-            timeStart: data.timeStart || '00:00',
-            timeEnd: data.timeEnd || '00:00',
-            duration: data.duration || 0,
-            status: data.status || 'pending',
-            notes: data.notes || '',
-            createdAt: data.createdAt || Timestamp.now()
-          } as TrainingRecord;
-        });
-      }
-      
-      // Filter by date if provided
-      if (dateStart && dateEnd) {
-        console.log("Filtering by date range:", dateStart, dateEnd);
-        const startTimestamp = Timestamp.fromDate(dateStart.toDate());
-        const endTimestamp = Timestamp.fromDate(dateEnd.toDate());
-        
-        records = records.filter(record => {
-          try {
-            const recordDate = record.sessionDate;
-            if (!recordDate) return false;
-            
-            // Handle comparison differently based on the type
-            if (recordDate.toDate) {
-              return recordDate >= startTimestamp && recordDate <= endTimestamp;
-            } else if (recordDate instanceof Date) {
-              const recordTimestamp = Timestamp.fromDate(recordDate);
-              return recordTimestamp >= startTimestamp && recordTimestamp <= endTimestamp;
-            }
-            return false;
-          } catch (error) {
-            console.error("Error filtering record by date:", error, record);
-            return false;
-          }
-        });
-      }
-      
-      // Sort by date (newest first)
-      records.sort((a, b) => {
-        try {
-          return b.sessionDate.seconds - a.sessionDate.seconds;
-        } catch (error) {
-          return 0;
-        }
-      });
-      
-      console.log("Final training records:", records);
+      console.log(`Successfully processed ${records.length} training records`);
       setTrainingRecords(records);
-      
-      calculateCourseProgress(records);
     } catch (error) {
       console.error('Error fetching training records:', error);
       message.error('Failed to load training records');
-      // Set empty arrays to prevent UI errors
-      setTrainingRecords([]);
-      setCourseProgress({});
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -451,12 +267,8 @@ const MemberHistoryPage = () => {
   }, [memberData]);
 
   useEffect(() => {
-    fetchTrainingRecords(
-      selectedMember || undefined, 
-      dateRange[0] || undefined, 
-      dateRange[1] || undefined
-    );
-  }, [selectedMember, dateRange, memberData]);
+    fetchTrainingRecords(selectedMember);
+  }, [selectedMember, memberData]);
 
   const handleMemberChange = (value: string) => {
     setSelectedMember(value);
@@ -516,7 +328,7 @@ const MemberHistoryPage = () => {
       render: (_: any, record: TrainingRecord) => (
         <div>
           <div>
-            {record.sessionDate.toDate().toLocaleDateString()}
+            {record.date.toLocaleDateString()}
           </div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
             {record.timeStart} - {record.timeEnd}

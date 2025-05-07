@@ -58,7 +58,7 @@ export default function NotificationsPage() {
         updateTime: Timestamp.now()
       });
       
-      // 從列表中移除已讀的通知
+      // Remove read notification from the list
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       message.success("Marked as read");
     } catch (error) {

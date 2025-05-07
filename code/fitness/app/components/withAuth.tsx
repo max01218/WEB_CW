@@ -29,21 +29,21 @@ export function withAuth<P extends object>(
             return;
           }
 
-          // 获取用户角色
+          // Get user role
           const userDoc = await getDoc(doc(db, 'members', user.uid));
           const userData = userDoc.data();
 
           if (!userData) {
-            message.error('用户信息不存在');
+            message.error('User information not found');
             router.push('/home');
             return;
           }
 
-          // 如果需要特定角色
+          // If specific role is required
           if (requiredRole && userData.role !== requiredRole) {
-            console.log(`需要角色 ${requiredRole}，但用户角色是 ${userData.role}`);
+            console.log(`Required role: ${requiredRole}, but user role is ${userData.role}`);
             
-            // 如果用户是trainer但没有trainerId，可能需要额外检查trainer集合
+            // If user is trainer but doesn't have trainerId, might need to check trainer collection
             if (requiredRole === 'trainer' && userData.role !== 'trainer') {
               const trainerDoc = await getDoc(doc(db, 'trainer', user.uid));
               if (trainerDoc.exists()) {
@@ -51,7 +51,7 @@ export function withAuth<P extends object>(
                 return;
               }
               
-              // 尝试查询trainer集合以查找匹配的email
+              // Try to query trainer collection to find matching email
               const trainersQuery = query(
                 collection(db, 'trainer'),
                 where('email', '==', user.email)
@@ -63,15 +63,15 @@ export function withAuth<P extends object>(
               }
             }
             
-            message.error('NO permission');
+            message.error('No permission');
             router.push('/home');
             return;
           }
 
           setIsAuthorized(true);
         } catch (error) {
-          console.error('权限检查错误:', error);
-          message.error('error');
+          console.error('Permission check error:', error);
+          message.error('Error');
           router.push('/home');
         } finally {
           setLoading(false);

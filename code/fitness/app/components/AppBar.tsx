@@ -58,7 +58,7 @@ export default function AppBar() {
               icon={<LogoutOutlined />}
               onClick={handleLogout}
             >
-              登出
+              Logout
             </Button>
           </>
         )}

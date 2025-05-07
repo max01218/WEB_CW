@@ -3,7 +3,7 @@
 import { Card, Row, Col, Statistic, Button, Spin, Select, Empty } from "antd";
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useState, useEffect } from "react";
-import { collection, query, where, Timestamp, getDocs } from "firebase/firestore";
+import { collection, query, where, Timestamp, getDocs, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from 'next/navigation';
@@ -21,7 +21,7 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
-// 注册 ChartJS 组件
+// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -30,8 +30,7 @@ ChartJS.register(
   BarElement,
   Title,
   Tooltip,
-  Legend,
-  ArcElement
+  Legend
 );
 
 interface TrainingRecord {
@@ -61,7 +60,7 @@ export default function ProgressPage() {
   const { user, memberData, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // 获取训练记录
+  // Get training records
   const fetchTrainingRecords = async () => {
     try {
       if (!user || !memberData) return;
@@ -106,14 +105,14 @@ export default function ProgressPage() {
     }
   }, [user, memberData, timeRange, authLoading]);
 
-  // 处理图表数据
+  // Process chart data
   const getChartData = (): ChartData => {
     const dateLabels: string[] = [];
     const durationData: number[] = [];
     const sessionData: { [key: string]: number } = {};
 
     if (timeRange === 'week') {
-      // 生成过去7天的标签
+      // Generate labels for the past 7 days
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
@@ -121,19 +120,19 @@ export default function ProgressPage() {
         durationData.push(0);
       }
 
-      // 填充数据
+      // Fill in data
       records.forEach(record => {
         const date = record.sessionDate.toDate();
         const dayIndex = 6 - Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
         if (dayIndex >= 0 && dayIndex < 7) {
           durationData[dayIndex] += record.duration;
         }
-        // 统计课程类型
+        // Count course types
         const sessionType = record.session || 'Regular Training';
         sessionData[sessionType] = (sessionData[sessionType] || 0) + 1;
       });
     } else {
-      // 生成过去30天的周标签
+      // Generate labels for the past 30 days by week
       for (let i = 4; i >= 0; i--) {
         const weekStart = new Date();
         weekStart.setDate(weekStart.getDate() - (i * 7));
@@ -141,14 +140,14 @@ export default function ProgressPage() {
         durationData.push(0);
       }
 
-      // 填充数据
+      // Fill in data
       records.forEach(record => {
         const date = record.sessionDate.toDate();
         const weekIndex = 4 - Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60 * 24 * 7));
         if (weekIndex >= 0 && weekIndex < 5) {
           durationData[weekIndex] += record.duration;
         }
-        // 统计课程类型
+        // Count course types
         const sessionType = record.session || 'Regular Training';
         sessionData[sessionType] = (sessionData[sessionType] || 0) + 1;
       });
@@ -166,7 +165,7 @@ export default function ProgressPage() {
     };
   };
 
-  // 获取训练类型分布数据
+  // Get training type distribution data
   const getSessionDistributionData = () => {
     const sessionTypes: { [key: string]: number } = {};
     records.forEach(record => {
@@ -189,7 +188,7 @@ export default function ProgressPage() {
     };
   };
 
-  // 计算总计数据
+  // Calculate total statistics
   const getTotalStats = () => {
     const totalDuration = records.reduce((sum, record) => sum + record.duration, 0);
     const totalSessions = records.length;

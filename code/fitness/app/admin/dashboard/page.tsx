@@ -29,9 +29,9 @@ const AdminDashboard = () => {
     margin: '0 auto',
     padding: '24px',
     position: 'relative' as const,
-    backgroundColor: '#001529', // 深色背景
+    backgroundColor: '#001529', // Dark background
     minHeight: '100vh',
-    color: '#fff', // 白色文字
+    color: '#fff', // White text
   };
 
   const logoutButtonStyle = {
@@ -41,16 +41,16 @@ const AdminDashboard = () => {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    color: '#fff', // 白色文字
+    color: '#fff', // White text
   };
 
   const cardStyle = {
-    backgroundColor: '#002140', // 深色卡片背景
-    borderColor: '#003a8c', // 深色边框
+    backgroundColor: '#002140', // Dark card background
+    borderColor: '#003a8c', // Dark border
   };
 
   const textStyle = {
-    color: '#fff', // 白色文字
+    color: '#fff', // White text
   };
 
   const handleLogout = async () => {
@@ -89,7 +89,7 @@ const AdminDashboard = () => {
         appointmentStatus: approved,
       });
       message.success(approved ? 'Appointment approved' : 'Appointment rejected');
-      fetchMembers(); // 刷新列表
+      fetchMembers(); // Refresh list
     } catch (error) {
       console.error('Error updating appointment status:', error);
       message.error('Failed to update appointment status');

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification } from 'antd';
+import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification, message } from 'antd';
 import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined, BellOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
@@ -42,36 +42,55 @@ const TrainerDashboard = () => {
     }
   };
 
+  // Get trainerId directly from trainer collection
+  const getTrainerId = async () => {
+    if (!memberData) {
+      console.error("No memberData available");
+      message.error("Authentication error: User data not available");
+      return null;
+    }
+
+    if (memberData.trainerId) {
+      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
+      return memberData.trainerId;
+    }
+
+    if (memberData.memberId) {
+      console.log("Using ID from memberData.memberId:", memberData.memberId);
+      return memberData.memberId;
+    }
+
+    try {
+      const trainersQuery = query(
+        collection(db, 'trainer'),
+        where('email', '==', memberData.email)
+      );
+      
+      const trainerSnapshot = await getDocs(trainersQuery);
+      if (!trainerSnapshot.empty) {
+        const trainerData = trainerSnapshot.docs[0].data();
+        return trainerData.trainerId || trainerSnapshot.docs[0].id;
+      } else {
+        console.error("No trainer found with email:", memberData.email);
+        // If no trainer found, use memberId as fallback
+        return memberData?.memberId || null;
+      }
+    } catch (error) {
+      console.error("Error finding trainer by email:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!memberData) return;
       
       setLoading(true);
       try {
-        // 直接从trainer集合中获取trainerId
-        let trainerIdQuery: string;
-        
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // 如果没有找到，则使用memberId作为fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId || 'T001';
-        }
-        
-        console.log("Current trainer ID:", trainerIdQuery);
-        
         // Fetch pending requests count
         const requestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('status', '==', 'pending')
         );
         
@@ -81,7 +100,7 @@ const TrainerDashboard = () => {
         // Fetch accepted requests count for total members
         const acceptedRequestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('status', '==', 'accepted')
         );
         
@@ -95,7 +114,7 @@ const TrainerDashboard = () => {
         
         const appointmentsQuery = query(
           collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('date', '>=', todayTimestamp),
           where('status', '==', 'scheduled')
         );
@@ -104,53 +123,13 @@ const TrainerDashboard = () => {
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
         // Fetch cancelled sessions
-<<<<<<< HEAD
-        try {
-          const cancelledQuery = query(
-            collection(db, 'appointments'),
-            where('trainerId', '==', trainerIdQuery),
-            where('status', '==', 'cancelled'),
-            orderBy('date', 'desc'),
-            limit(10)
-          );
-          
-          const cancelledSnapshot = await getDocs(cancelledQuery);
-          const cancelledData = cancelledSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as CancelledSession[];
-          
-          setCancelledSessions(cancelledData);
-          
-          // Show notification for cancelled sessions if there are any
-          if (cancelledData.length > 0) {
-            cancelledData.forEach(session => {
-              try {
-                notification.warning({
-                  message: 'Session Cancelled',
-                  description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
-                  icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-                  duration: 5
-                });
-              } catch (error) {
-                console.error('Error showing notification:', error);
-              }
-=======
         const cancelledQuery = query(
           collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
+          where('trainerId', '==', await getTrainerId()),
           where('status', '==', 'cancelled'),
           orderBy('date', 'desc'),
           limit(10)
         );
-        type CancelledSession = {
-          id: string;
-          memberEmail?: string;
-          timeStart?: string;
-          timeEnd?: string;
-          date?: Timestamp;
-          [key: string]: any; // 若不确定还包含哪些字段
-        };
         const cancelledSnapshot = await getDocs(cancelledQuery);
         const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -166,11 +145,8 @@ const TrainerDashboard = () => {
               description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
               icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
               duration: 5
->>>>>>> 94e635e13f399c101626d6589341a26d75b7ce23
             });
-          }
-        } catch (error) {
-          console.error('Error fetching cancelled sessions:', error);
+          });
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);

@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request });
   const { pathname } = request.nextUrl;
 
-  // 允许访问的公开路径
+  // Public paths that are allowed to access
   const publicPaths = [
     '/',
     '/home',
@@ -15,24 +15,24 @@ export async function middleware(request: NextRequest) {
     '/api/auth',
   ];
 
-  // 检查是否是公开路径
+  // Check if it's a public path
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  // 如果用户未登录且访问非公开路径，重定向到登录页
+  // If user is not logged in and accessing non-public path, redirect to login page
   if (!token && !isPublicPath) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // 如果用户已登录且访问登录/注册页，重定向到首页
+  // If user is logged in and accessing login/register page, redirect to home page
   if (token && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(new URL('/home', request.url));
   }
 
-  // 检查用户角色
+  // Check user role
   if (token) {
-    // 如果访问 trainer 页面但用户不是 trainer 角色
+    // If accessing trainer page but user is not a trainer
     if (pathname.startsWith('/trainer') && token.role !== 'trainer') {
       return NextResponse.redirect(new URL('/home', request.url));
     }
@@ -41,16 +41,16 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// 配置中间件匹配的路径
+// Configure middleware matching paths
 export const config = {
   matcher: [
     /*
-     * 匹配所有路径除了:
-     * - api/auth (NextAuth.js 相关)
-     * - _next/static (静态文件)
-     * - _next/image (图片优化)
-     * - favicon.ico (网站图标)
-     * - 公开路径
+     * Match all paths except:
+     * - api/auth (NextAuth.js related)
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico (website icon)
+     * - public paths
      */
     '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
   ],

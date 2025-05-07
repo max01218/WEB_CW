@@ -14,7 +14,7 @@ const firebaseConfig = {
   databaseURL: "https://sportsclub6251-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
-// 初始化 Firebase
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -29,8 +29,8 @@ export const bypassSecurityRules = async (data: {
   status: string;
 }) => {
   try {
-    // 使用Cloud Function API路径来处理请求接受操作
-    // 注意：您需要在Firebase项目中实现相应的Cloud Function
+    // Use Cloud Function API path to handle request acceptance
+    // Note: You need to implement the corresponding Cloud Function in your Firebase project
     const apiUrl = `https://us-central1-sportsclub6251.cloudfunctions.net/acceptMemberRequest`;
     
     const response = await fetch(apiUrl, {
@@ -51,7 +51,7 @@ export const bypassSecurityRules = async (data: {
     return true;
   } catch (error) {
     console.error("Error in bypassSecurityRules:", error);
-    // 创建一个自定义事件，记录错误以便后续查看
+    // Create a custom event to log the error for later review
     if (typeof window !== 'undefined') {
       const event = new CustomEvent('firebase-error', { 
         detail: { operation: 'accept-request', error, data } 
@@ -74,7 +74,7 @@ export const redirectRequest = async (data: {
   trainingGoal: string;
 }) => {
   try {
-    // 使用Cloud Function API路径来处理请求重定向操作
+    // Use Cloud Function API path to handle request redirection
     const apiUrl = `https://us-central1-sportsclub6251.cloudfunctions.net/redirectMemberRequest`;
     
     const response = await fetch(apiUrl, {
@@ -95,7 +95,7 @@ export const redirectRequest = async (data: {
     return { success: true, result };
   } catch (error) {
     console.error("Error in redirectRequest:", error);
-    // 创建一个自定义事件，记录错误以便后续查看
+    // Create a custom event to log the error for later review
     if (typeof window !== 'undefined') {
       const event = new CustomEvent('firebase-error', { 
         detail: { operation: 'redirect-request', error, data } 
