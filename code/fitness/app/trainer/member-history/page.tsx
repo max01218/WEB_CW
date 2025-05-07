@@ -89,33 +89,9 @@ const MemberHistoryPage = () => {
     if (!memberData) return;
     
     try {
-<<<<<<< HEAD
-      // Prioritize using trainerId from memberData, if not available try to query from trainer collection
-      let trainerIdQuery = memberData.trainerId;
-
-      // If there's no trainerId in memberData, try to query from trainer collection
-      if (!trainerIdQuery) {
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // If still not found, use memberId as fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId;
-        }
-      }
-      
-=======
       // Prioritize trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = await getTrainerId();
 
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       console.log("Current trainer ID:", trainerIdQuery);
       
       // Store all members in this map
@@ -171,47 +147,6 @@ const MemberHistoryPage = () => {
     if (!memberData) return;
     
     try {
-<<<<<<< HEAD
-      // Prioritize using trainerId from memberData, if not available try to query from trainer collection
-      let trainerIdQuery = memberData.trainerId;
-
-      // If there's no trainerId in memberData, try to query from trainer collection
-      if (!trainerIdQuery) {
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // If still not found, use memberId as fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId;
-        }
-      }
-      
-      console.log("Fetching training records for trainer:", trainerIdQuery, "member:", memberId);
-      
-      // Create query conditions - only get data from appointments collection
-      let appointmentsQuery;
-      
-      if (memberId) {
-        // If a member is specified, filter by member email
-        appointmentsQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery),
-          where('memberEmail', '==', memberId)
-        );
-      } else {
-        // Otherwise get all appointments for this trainer
-        appointmentsQuery = query(
-          collection(db, 'appointments'),
-          where('trainerId', '==', trainerIdQuery)
-        );
-=======
       // Prioritize trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = await getTrainerId();
 
@@ -221,31 +156,10 @@ const MemberHistoryPage = () => {
       const memberDoc = await getDoc(doc(db, 'members', memberId));
       if (!memberDoc.exists()) {
         throw new Error('Member not found');
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       }
       
       const memberEmail = memberDoc.data().email;
       
-<<<<<<< HEAD
-      // Convert appointments to training record format
-      let records: TrainingRecord[] = appointmentsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        const appointmentDate = data.date?.toDate() || new Date();
-        let status: 'completed' | 'cancelled' | 'pending' = 'pending';
-        
-        // Determine record status based on appointment status and date
-        if (data.status === 'cancelled') {
-          status = 'cancelled';
-        } else if (data.status === 'scheduled') {
-          // If date has passed and status is still scheduled, consider it completed
-          if (appointmentDate < new Date()) {
-            status = 'completed';
-          } else {
-            status = 'pending';
-          }
-        } else if (data.status === 'completed') {
-          status = 'completed';
-=======
       // Get all appointments for this member with this trainer
       const appointmentsQuery = query(
         collection(db, 'appointments'),
@@ -275,25 +189,15 @@ const MemberHistoryPage = () => {
           if (now > appointmentTime) {
             status = 'completed';
           }
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         }
         
         return {
           id: doc.id,
-<<<<<<< HEAD
-          memberEmail: data.memberEmail || '',
-          memberName: data.trainerName || 'Unknown Trainer', // Use trainerName as display name
-          trainerId: data.trainerId || trainerIdQuery,
-          trainerName: data.trainerName || 'Unknown Trainer',
-          courseType: data.courseType || 'General Training',
-          sessionDate: data.date || Timestamp.now(),
-=======
           memberEmail: memberEmail,
           memberName: memberDoc.data().name || 'Unknown Member',
           trainerId: trainerIdQuery,
           trainerName: memberData?.name || 'Current Trainer',
           date: appointmentDate,
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
           timeStart: data.timeStart || '00:00',
           timeEnd: data.timeEnd || '00:00',
           duration: data.duration || 0,
@@ -303,61 +207,11 @@ const MemberHistoryPage = () => {
         } as TrainingRecord;
       });
       
-<<<<<<< HEAD
-      // Filter by date
-      if (dateStart && dateEnd) {
-        console.log("Filtering by date range:", dateStart, dateEnd);
-        const startTimestamp = Timestamp.fromDate(dateStart.toDate());
-        const endTimestamp = Timestamp.fromDate(dateEnd.toDate());
-        
-        records = records.filter(record => {
-          try {
-            const recordDate = record.sessionDate;
-            if (!recordDate) return false;
-            
-            // Handle different types of recordDate
-            if (recordDate.toDate) {
-              return recordDate >= startTimestamp && recordDate <= endTimestamp;
-            } else if (recordDate instanceof Date) {
-              const recordTimestamp = Timestamp.fromDate(recordDate);
-              return recordTimestamp >= startTimestamp && recordTimestamp <= endTimestamp;
-            }
-            return false;
-          } catch (error) {
-            console.error("Error filtering record by date:", error, record);
-            return false;
-          }
-        });
-      }
-      
-      // Sort by date (newest first)
-      records.sort((a, b) => {
-        try {
-          if (a.sessionDate && b.sessionDate) {
-            return b.sessionDate.seconds - a.sessionDate.seconds;
-          }
-          return 0;
-        } catch (error) {
-          return 0;
-        }
-      });
-      
-      console.log("Final training records:", records);
-=======
       console.log(`Successfully processed ${records.length} training records`);
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
       setTrainingRecords(records);
     } catch (error) {
       console.error('Error fetching training records:', error);
       message.error('Failed to load training records');
-<<<<<<< HEAD
-      // Set empty array to prevent UI errors
-      setTrainingRecords([]);
-      setCourseProgress({});
-    } finally {
-      setLoading(false);
-=======
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
     }
   };
 

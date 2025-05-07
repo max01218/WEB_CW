@@ -87,29 +87,6 @@ const TrainerDashboard = () => {
       
       setLoading(true);
       try {
-<<<<<<< HEAD
-        // Get trainerId directly from the trainer collection
-        let trainerIdQuery: string;
-        
-        const trainersQuery = query(
-          collection(db, 'trainer'),
-          where('email', '==', memberData.email)
-        );
-        
-        const trainerSnapshot = await getDocs(trainersQuery);
-        if (!trainerSnapshot.empty) {
-          const trainerData = trainerSnapshot.docs[0].data();
-          trainerIdQuery = trainerData.trainerId || trainerSnapshot.docs[0].id;
-        } else {
-          // If not found, use memberId as fallback
-          console.warn("No trainer found, using memberId as fallback");
-          trainerIdQuery = memberData.memberId || 'T001';
-        }
-        
-        console.log("Current trainer ID:", trainerIdQuery);
-        
-=======
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         // Fetch pending requests count
         const requestsQuery = query(
           collection(db, 'requests'),
@@ -145,64 +122,6 @@ const TrainerDashboard = () => {
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
         
-<<<<<<< HEAD
-        // Get cancelled appointments - directly from appointments database
-        try {
-          console.log("Getting cancelled appointments:", trainerIdQuery);
-          // Simplify query, remove orderBy to avoid index issues
-          const cancelledQuery = query(
-            collection(db, 'appointments'),
-            where('trainerId', '==', trainerIdQuery),
-            where('status', '==', 'cancelled')
-            // Remove orderBy to avoid needing to create compound index
-          );
-          
-          const cancelledSnapshot = await getDocs(cancelledQuery);
-          console.log(`Found ${cancelledSnapshot.docs.length} cancelled appointments`);
-          
-          const cancelledData = cancelledSnapshot.docs
-            .map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                memberEmail: data.memberEmail || 'Unknown',
-                timeStart: data.timeStart || 'N/A',
-                timeEnd: data.timeEnd || 'N/A',
-                date: data.date,
-                trainerName: data.trainerName || 'Unknown',
-                status: 'cancelled'
-              };
-            })
-            // Sort manually in JavaScript
-            .sort((a, b) => {
-              if (a.date && b.date) {
-                return b.date.seconds - a.date.seconds;
-              }
-              return 0;
-            })
-            // Limit to 10 records
-            .slice(0, 10);
-          
-          setCancelledSessions(cancelledData);
-          
-          // Show notifications
-          if (cancelledData.length > 0) {
-            cancelledData.forEach(session => {
-              try {
-                notification.warning({
-                  message: 'Session Cancelled',
-                  description: `${session.trainerName} has cancelled session from ${session.timeStart} to ${session.timeEnd}`,
-                  icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-                  duration: 5
-                });
-              } catch (error) {
-                console.error('Error displaying notification:', error);
-              }
-            });
-          }
-        } catch (error) {
-          console.error('Error getting cancelled appointments:', error);
-=======
         // Fetch cancelled sessions
         const cancelledQuery = query(
           collection(db, 'appointments'),
@@ -228,7 +147,6 @@ const TrainerDashboard = () => {
               duration: 5
             });
           });
->>>>>>> 0227ff521ac7718de42c3e71b8e80bf151c87189
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
