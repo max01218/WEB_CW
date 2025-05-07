@@ -5,10 +5,11 @@ import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined, Bel
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@/lib/auth';
+import { useAuth, useTrainerData } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const { Title, Text } = Typography;
 
@@ -30,7 +31,8 @@ const TrainerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [cancelledSessions, setCancelledSessions] = useState<CancelledSession[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const { memberData } = useAuth();
+  const { user, memberData } = useAuth();
+  const trainerData = useTrainerData(user?.email || null);
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -42,90 +44,48 @@ const TrainerDashboard = () => {
     }
   };
 
-  // Get trainerId directly from trainer collection
-  const getTrainerId = async () => {
-    if (!memberData) {
-      console.error("No memberData available");
-      message.error("Authentication error: User data not available");
-      return null;
-    }
-
-    if (memberData.trainerId) {
-      console.log("Using ID from memberData.trainerId:", memberData.trainerId);
-      return memberData.trainerId;
-    }
-
-    if (memberData.memberId) {
-      console.log("Using ID from memberData.memberId:", memberData.memberId);
-      return memberData.memberId;
-    }
-
-    try {
-      const trainersQuery = query(
-        collection(db, 'trainer'),
-        where('email', '==', memberData.email)
-      );
-      
-      const trainerSnapshot = await getDocs(trainersQuery);
-      if (!trainerSnapshot.empty) {
-        const trainerData = trainerSnapshot.docs[0].data();
-        return trainerData.trainerId || trainerSnapshot.docs[0].id;
-      } else {
-        console.error("No trainer found with email:", memberData.email);
-        // If no trainer found, use memberId as fallback
-        return memberData?.memberId || null;
-      }
-    } catch (error) {
-      console.error("Error finding trainer by email:", error);
-      return null;
-    }
-  };
-
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!memberData) return;
-      
+      if (!trainerData) return;
       setLoading(true);
       try {
+        const trainerId = trainerData.trainerId;
         // Fetch pending requests count
         const requestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', await getTrainerId()),
+          where('trainerId', '==', trainerId),
           where('status', '==', 'pending')
         );
-        
         const requestsSnapshot = await getDocs(requestsQuery);
         setPendingRequests(requestsSnapshot.docs.length);
-        
+
         // Fetch accepted requests count for total members
         const acceptedRequestsQuery = query(
           collection(db, 'requests'),
-          where('trainerId', '==', await getTrainerId()),
+          where('trainerId', '==', trainerId),
           where('status', '==', 'accepted')
         );
-        
         const acceptedRequestsSnapshot = await getDocs(acceptedRequestsQuery);
         setTotalMembers(acceptedRequestsSnapshot.docs.length);
-        
+
         // Fetch upcoming sessions count
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayTimestamp = Timestamp.fromDate(today);
-        
+
         const appointmentsQuery = query(
           collection(db, 'appointments'),
-          where('trainerId', '==', await getTrainerId()),
+          where('trainerId', '==', trainerId),
           where('date', '>=', todayTimestamp),
           where('status', '==', 'scheduled')
         );
-        
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
-        
+
         // Fetch cancelled sessions
         const cancelledQuery = query(
           collection(db, 'appointments'),
-          where('trainerId', '==', await getTrainerId()),
+          where('trainerId', '==', trainerId),
           where('status', '==', 'cancelled'),
           orderBy('date', 'desc'),
           limit(10)
@@ -136,7 +96,7 @@ const TrainerDashboard = () => {
           ...doc.data()
         }));
         setCancelledSessions(cancelledData);
-        
+
         // Show notification for cancelled sessions if there are any
         if (cancelledData.length > 0) {
           cancelledData.forEach(session => {
@@ -154,9 +114,8 @@ const TrainerDashboard = () => {
         setLoading(false);
       }
     };
-    
     fetchDashboardData();
-  }, [memberData]);
+  }, [trainerData]);
 
   const modules = [
     {

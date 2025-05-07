@@ -23,6 +23,7 @@ import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { doc, updateDoc } from 'firebase/firestore';
 import { withAuth } from '@/app/components/withAuth';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   containerStyle,
   contentStyle,
@@ -432,18 +433,9 @@ const DashboardPage = () => {
     message.info('Redirecting to profile page...');
   };
 
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
-      }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
+  if (authLoading) return <Spin />;
+  if (!user) return <div>not logged in</div>;
+  if (!memberData) return <div>No membership details</div>;
 
   return (
     <div style={containerStyle}>

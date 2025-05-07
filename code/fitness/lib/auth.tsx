@@ -11,6 +11,7 @@ import {
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface MemberData {
   memberId: string;
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!memberData) {
           console.error('Failed to fetch or create member data');
         }
+        setMemberData(memberData);
       } else {
         setMemberData(null);
       }
@@ -165,4 +167,22 @@ export const useRequireAuth = () => {
   }, [loading, user, router]);
 
   return { user, memberData, loading };
-}; 
+};
+
+export function useTrainerData(email: string | null) {
+  const [trainerData, setTrainerData] = useState<any>(null);
+
+  useEffect(() => {
+    if (!email) return;
+    const fetchTrainer = async () => {
+      const q = query(collection(db, 'trainer'), where('email', '==', email));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setTrainerData(snapshot.docs[0].data());
+      }
+    };
+    fetchTrainer();
+  }, [email]);
+
+  return trainerData;
+} 
