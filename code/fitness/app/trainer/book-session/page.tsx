@@ -16,7 +16,7 @@ const { TextArea } = Input;
 interface Appointment {
   id: string;
   memberEmail: string;
-  memberName: string;
+  memberName?: string;
   trainerId: string;
   trainerName: string;
   courseType: string;
@@ -329,7 +329,6 @@ const BookSessionPage = () => {
       // Create appointment data with all required fields
       const appointmentData = {
         memberEmail: values.memberEmail || '',
-        memberName: selectedMember.name || 'Unknown Member',
         memberId: selectedMember.id || '',
         trainerId: trainerId,
         trainerName: trainerName,
@@ -368,7 +367,7 @@ const BookSessionPage = () => {
           courseType: values.courseType || 'General Fitness',
           trainerId: trainerId,
           memberId: selectedMember.id || '',
-          memberName: selectedMember.name || 'Unknown Member',
+          memberName: trainerName,
           memberEmail: values.memberEmail || '',
           duration: durationMinutes || 60,
           date: Timestamp.fromDate(selectedDate.toDate()),
@@ -475,7 +474,7 @@ const BookSessionPage = () => {
       
       return {
         type,
-        content: `${appointment.memberName} - ${appointment.courseType}`,
+        content: `${appointment.memberEmail} - ${appointment.courseType}`,
         time: `${appointment.timeStart} - ${appointment.timeEnd}`,
         appointment
       };
@@ -583,9 +582,9 @@ const BookSessionPage = () => {
             pagination={false}
             columns={[
               {
-                title: 'Member Name',
-                dataIndex: 'memberName',
-                key: 'memberName',
+                title: 'Member Email',
+                dataIndex: 'memberEmail',
+                key: 'memberEmail',
               },
               {
                 title: 'Course Type',
