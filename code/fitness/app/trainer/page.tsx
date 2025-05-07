@@ -100,13 +100,19 @@ const TrainerDashboard = () => {
           orderBy('date', 'desc'),
           limit(10)
         );
-        
+        type CancelledSession = {
+          id: string;
+          memberEmail?: string;
+          timeStart?: string;
+          timeEnd?: string;
+          date?: Timestamp;
+          [key: string]: any; // 若不确定还包含哪些字段
+        };
         const cancelledSnapshot = await getDocs(cancelledQuery);
-        const cancelledData = cancelledSnapshot.docs.map(doc => ({
+        const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        
         setCancelledSessions(cancelledData);
         
         // Show notification for cancelled sessions if there are any
