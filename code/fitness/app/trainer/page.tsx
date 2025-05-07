@@ -1,12 +1,14 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Row, Col, Statistic, Typography, Spin } from 'antd';
-import { CalendarOutlined, HistoryOutlined, UserAddOutlined } from '@ant-design/icons';
+import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const { Title, Text } = Typography;
 
@@ -17,6 +19,15 @@ const TrainerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const { memberData } = useAuth();
   const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -54,6 +65,16 @@ const TrainerDashboard = () => {
         const requestsSnapshot = await getDocs(requestsQuery);
         setPendingRequests(requestsSnapshot.docs.length);
         
+        // Fetch accepted requests count for total members
+        const acceptedRequestsQuery = query(
+          collection(db, 'requests'),
+          where('trainerId', '==', trainerIdQuery),
+          where('status', '==', 'accepted')
+        );
+        
+        const acceptedRequestsSnapshot = await getDocs(acceptedRequestsQuery);
+        setTotalMembers(acceptedRequestsSnapshot.docs.length);
+        
         // Fetch upcoming sessions count
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -68,15 +89,6 @@ const TrainerDashboard = () => {
         
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         setUpcomingSessions(appointmentsSnapshot.docs.length);
-        
-        // Fetch assigned members count
-        const membersQuery = query(
-          collection(db, 'members'),
-          where('trainerId', '==', trainerIdQuery)
-        );
-        
-        const membersSnapshot = await getDocs(membersQuery);
-        setTotalMembers(membersSnapshot.docs.length);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -120,7 +132,17 @@ const TrainerDashboard = () => {
         borderRadius: '8px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        <Title level={2} style={{ marginBottom: '24px' }}>Trainer Dashboard</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <Title level={2} style={{ margin: 0 }}>Trainer Dashboard</Title>
+          <Button 
+            type="primary" 
+            danger 
+            icon={<LogoutOutlined />}
+            onClick={handleLogout}
+          >
+            Logout
+          </Button>
+        </div>
         
         {loading ? (
           <div style={{ textAlign: 'center', padding: '50px' }}>
