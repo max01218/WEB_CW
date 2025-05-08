@@ -22,7 +22,7 @@ const ProfilePage = () => {
       form.setFieldsValue({
         name: memberData.name,
         email: memberData.email,
-        birthday: memberData.birthday ? dayjs(memberData.birthday) : null,
+        birthday: memberData.birthdate ? dayjs(memberData.birthdate) : null,
         address: memberData.address || '',
       });
     };
