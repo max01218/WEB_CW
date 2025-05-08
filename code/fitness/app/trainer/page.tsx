@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Row, Col, Statistic, Typography, Spin, Alert, List, Badge, notification, message } from 'antd';
 import { CalendarOutlined, HistoryOutlined, UserAddOutlined, LogoutOutlined, BellOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth, useTrainerData } from '@/lib/auth';
 import { withAuth } from '@/app/components/withAuth';
@@ -22,6 +22,7 @@ interface CancelledSession {
   date?: Timestamp;
   trainerName?: string;
   status?: string;
+  read?: boolean;
 }
 
 const TrainerDashboard = () => {
@@ -88,34 +89,68 @@ const TrainerDashboard = () => {
           where('trainerId', '==', trainerId),
           where('status', '==', 'cancelled'),
           orderBy('date', 'desc'),
-          limit(10)
+          limit(20)
         );
         const cancelledSnapshot = await getDocs(cancelledQuery);
-        const cancelledData: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
+        let fetchedCancelledSessions: CancelledSession[] = cancelledSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          read: doc.data().read ?? false
         }));
-        setCancelledSessions(cancelledData);
 
-        // Show notification for cancelled sessions if there are any
-        if (cancelledData.length > 0) {
-          cancelledData.forEach(session => {
+        // Filter out already read sessions for immediate display and notifications
+        const unreadSessions = fetchedCancelledSessions.filter(session => !session.read);
+        setCancelledSessions(fetchedCancelledSessions);
+
+        // Show notification for unread cancelled sessions if there are any
+        if (unreadSessions.length > 0) {
+          unreadSessions.forEach(session => {
             notification.warning({
+              key: session.id,
               message: 'Session Cancelled',
               description: `${session.memberEmail || 'A member'} has cancelled session from ${session.timeStart || 'N/A'} to ${session.timeEnd || 'N/A'}`,
               icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
-              duration: 5
+              duration: 10,
+              btn: (
+                <Button type="primary" size="small" onClick={async () => {
+                  await markSessionAsRead(session.id);
+                  (notification as any).close(session.id);
+                }}>
+                  Mark as Read
+                </Button>
+              ),
+              onClose: () => {
+              }
             });
           });
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        message.error('Failed to fetch dashboard data.');
       } finally {
         setLoading(false);
       }
     };
     fetchDashboardData();
   }, [trainerData]);
+
+  const markSessionAsRead = async (sessionId: string) => {
+    try {
+      const sessionRef = doc(db, 'appointments', sessionId);
+      await updateDoc(sessionRef, { read: true });
+      setCancelledSessions(prevSessions =>
+        prevSessions.map(session =>
+          session.id === sessionId ? { ...session, read: true } : session
+        )
+      );
+      message.success('Session marked as read.');
+    } catch (error) {
+      console.error('Error marking session as read:', error);
+      message.error('Failed to mark session as read.');
+    }
+  };
+  
+  const unreadCancelledSessionsCount = cancelledSessions.filter(s => !s.read).length;
 
   const modules = [
     {
@@ -153,7 +188,7 @@ const TrainerDashboard = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <Title level={2} style={{ margin: 0 }}>Trainer Dashboard</Title>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Badge count={cancelledSessions.length} overflowCount={99}>
+            <Badge count={unreadCancelledSessionsCount} overflowCount={99}>
               <Button 
                 icon={<BellOutlined />} 
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -175,15 +210,22 @@ const TrainerDashboard = () => {
         
         {showNotifications && cancelledSessions.length > 0 && (
           <div style={{ marginBottom: '24px' }}>
-            <Card title="Cancelled Sessions" style={{ marginBottom: '24px' }}>
+            <Card title="Cancelled Sessions Notifications" style={{ marginBottom: '24px' }}>
               <List
                 itemLayout="horizontal"
-                dataSource={cancelledSessions}
+                dataSource={cancelledSessions.filter(s => !s.read)}
+                locale={{ emptyText: "No unread cancelled session notifications." }}
                 renderItem={(item) => (
-                  <List.Item>
+                  <List.Item
+                    actions={[
+                      <Button type="link" onClick={() => markSessionAsRead(item.id)}>
+                        Mark as Read
+                      </Button>
+                    ]}
+                  >
                     <List.Item.Meta
                       avatar={<CloseCircleOutlined style={{ color: 'red', fontSize: '24px' }} />}
-                      title={`Session with ${item.trainerName}`}
+                      title={`Session with ${item.trainerName || item.memberEmail || 'N/A'}`}
                       description={item.date && item.date.toDate ? 
                         `${new Date(item.date.toDate()).toLocaleDateString()} from ${item.timeStart} to ${item.timeEnd}` :
                         `From ${item.timeStart} to ${item.timeEnd}`
@@ -284,4 +326,4 @@ const TrainerDashboard = () => {
   );
 };
 
-export default withAuth(TrainerDashboard, { requiredRole: 'trainer' }); 
+export default withAuth(TrainerDashboard, { requiredRole: 'trainer' });

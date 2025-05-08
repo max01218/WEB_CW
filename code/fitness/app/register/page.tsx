@@ -107,7 +107,7 @@ const RegisterPage = () => {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
-        values.password
+        values.password,
       );
       const user = userCredential.user;
 
@@ -121,12 +121,13 @@ const RegisterPage = () => {
         name: values.name,
         role: 'member',
         status: 'active',
-        birthday: null,
-        address: '',
+        birthdate: values.birthdate ? values.birthdate.format('YYYY-MM-DD') : '',
+        address: values.address || '',
         trainerId: '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        emailVerified: false
+        emailVerified: false,
+        appointmentStatus: false
       };
 
       // Store user data in Firestore

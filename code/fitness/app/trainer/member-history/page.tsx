@@ -44,7 +44,7 @@ const MemberHistoryPage = () => {
   const [trainingRecords, setTrainingRecords] = useState<TrainingRecord[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [courseProgress, setCourseProgress] = useState<Record<string, CourseProgress>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedMember, setSelectedMember] = useState<string>('');
   const [dateRange, setDateRange] = useState<[any, any]>([null, null]);
   const { memberData } = useAuth();
@@ -144,8 +144,19 @@ const MemberHistoryPage = () => {
   };
 
   const fetchTrainingRecords = async (memberId: string) => {
-    if (!memberData) return;
-    
+    if (!memberId) {
+      console.error('No memberId provided for training record fetch');
+      return;
+    }
+    if (!memberData) {
+      console.error('No memberData, cannot fetch training records.');
+      setTrainingRecords([]);
+      setCourseProgress({});
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
       // Prioritize trainerId from memberData, if not available try to query from trainer collection
       let trainerIdQuery = await getTrainerId();
@@ -209,19 +220,23 @@ const MemberHistoryPage = () => {
       
       console.log(`Successfully processed ${records.length} training records`);
       setTrainingRecords(records);
+      calculateCourseProgress(records);
     } catch (error) {
       console.error('Error fetching training records:', error);
       message.error('Failed to load training records');
+      setTrainingRecords([]);
+      setCourseProgress({});
+    } finally {
+      setLoading(false);
     }
   };
 
   const calculateCourseProgress = (records: TrainingRecord[]) => {
     try {
-      // Filter valid records (containing courseType field)
+      // Filter out records with missing courseType
       const validRecords = records.filter(record => record.courseType);
       console.log(`Calculating progress for ${validRecords.length} valid records`);
       
-      // Group by course type and only calculate completed courses
       const courseGroups = validRecords.reduce<Record<string, TrainingRecord[]>>((acc, record) => {
         try {
           const { courseType } = record;
@@ -243,7 +258,6 @@ const MemberHistoryPage = () => {
       
       const progress: Record<string, CourseProgress> = {};
       for (const [courseType, courseRecords] of Object.entries(courseGroups)) {
-        // Number of sessions required to complete each course type (can be adjusted)
         const totalSessionsRequired = 10;
         const completedSessions = courseRecords.length;
         const progressPercentage = Math.min(Math.round((completedSessions / totalSessionsRequired) * 100), 100);
@@ -269,7 +283,13 @@ const MemberHistoryPage = () => {
   }, [memberData]);
 
   useEffect(() => {
-    fetchTrainingRecords(selectedMember);
+    if (selectedMember) {
+      fetchTrainingRecords(selectedMember);
+    } else {
+      setTrainingRecords([]);
+      setCourseProgress({});
+      setLoading(false);
+    }
   }, [selectedMember, memberData]);
 
   const handleMemberChange = (value: string) => {
@@ -405,7 +425,7 @@ const MemberHistoryPage = () => {
                 allowClear
               >
                 {members.map(member => (
-                  <Option key={member.id} value={member.email}>
+                  <Option key={member.id} value={member.id}>
                     {member.name}
                   </Option>
                 ))}

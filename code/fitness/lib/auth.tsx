@@ -19,7 +19,7 @@ interface MemberData {
   name: string;
   role: string;
   status: string;
-  birthday: Date | null;
+  birthdate: string | null;
   address: string;
   trainerId: string;
   createdAt: Timestamp;
@@ -31,7 +31,7 @@ interface AuthContextType {
   memberData: MemberData | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, birthdate: string, address: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -43,33 +43,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // Function to get member data
-  const getMemberData = async (user: User): Promise<MemberData> => {
+  const getMemberData = async (user: User): Promise<any> => {
     try {
-      // 1. Try to get existing member data
       const memberDoc = await getDoc(doc(db, 'members', user.uid));
-      
       if (memberDoc.exists()) {
-        return memberDoc.data() as MemberData;
+        return memberDoc.data();
       }
-      
-      // 2. If member data doesn't exist, create new member data
-      const newMemberData: MemberData = {
+      const newMemberData = {
         memberId: user.uid,
+        uid: user.uid,
         email: user.email,
         name: 'Unnamed Member',
         role: 'member',
         status: 'active',
-        birthday: null,
+        birthdate: '',
         address: '',
         trainerId: '',
+        appointmentStatus: false,
+        emailVerified: user.emailVerified || false,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       };
-      
-      // 3. Write new member data
       await setDoc(doc(db, 'members', user.uid), newMemberData);
-      
-      // 4. Set state
       return newMemberData;
     } catch (error) {
       console.error('Error getting member data:', error);
@@ -122,13 +117,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string): Promise<void> => {
+  const signUp = async (email: string, password: string, name: string, birthdate: string, address: string): Promise<void> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      const memberData = await getMemberData(user);
+      const newMemberData = {
+        memberId: user.uid,
+        uid: user.uid,
+        email: user.email,
+        name,
+        role: 'member',
+        status: 'active',
+        birthdate,
+        address,
+        trainerId: '',
+        appointmentStatus: false,
+        emailVerified: user.emailVerified || false,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+      await setDoc(doc(db, 'members', user.uid), newMemberData);
       setUser(user);
-      setMemberData(memberData);
+      setMemberData(newMemberData);
     } catch (error: any) {
       console.error('Sign up error:', error);
       throw new Error(error.message || 'Sign up failed');
