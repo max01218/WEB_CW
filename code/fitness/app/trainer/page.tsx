@@ -114,7 +114,7 @@ const TrainerDashboard = () => {
               btn: (
                 <Button type="primary" size="small" onClick={async () => {
                   await markSessionAsRead(session.id);
-                  (notification as any).close(session.id);
+                  notification.destroy(session.id);
                 }}>
                   Mark as Read
                 </Button>
